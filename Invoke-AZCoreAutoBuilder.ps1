@@ -19,7 +19,6 @@ $Downloaddata = "No"
 ########################################################################
 # !!!DO NOT EDIT BELOW THIS LINE UNLESS YOU KNOW WHAT YOU ARE DOING!!! #
 ########################################################################
-$FinalServerName = $FinalServerFolder.Split("\")[-1]
 $AzerothCoreRepo = "https://github.com/azerothcore/azerothcore-wotlk.git"
 $GitURL = "https://api.github.com/repos/git-for-windows/git/releases/latest"
 $GitInstallFile = "$env:USERPROFILE\Downloads\$($GitVersion.name)"
@@ -35,8 +34,6 @@ $OpenSSLInstallFile = "$env:USERPROFILE\Downloads\$OpenSSLFileName"
 $MySQLURL = "https://dev.mysql.com/get/Downloads/MySQL-5.7/mysql-5.7.29-winx64.zip"
 $MySQLFileName = $MySQLURL.Split("/")[-1]
 $MySQLZipFile = "$env:USERPROFILE\Downloads\$MySQLFileName"
-$MySQLConnectorURL = "https://dev.mysql.com/get/Downloads/Connector-Net/mysql-connector-net-8.0.19.msi"
-$MySQLConnectorFileName = $MySQLConnectorURL.Split("/")[-1]
 $HeidiURL = "https://www.heidisql.com/downloads/releases/HeidiSQL_10.3_64_Portable.zip"
 $HeidiFileName = $HeidiURL.Split("/")[-1]
 $HeidiZipFile = "$env:USERPROFILE\Downloads\$HeidiFileName"
