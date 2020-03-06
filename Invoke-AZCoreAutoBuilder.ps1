@@ -9,7 +9,12 @@ $BaseLocation = "D:\WOW_SERVERS-TEST\AzerothCore-WotLK"
 # BuildFolder is where all those repositories will be compiled
 $BuildFolder = "D:\WOW_SERVERS-TEST\Build-AzerothCore"
 # FinalServerFolder is where your finished product will be.  This entire folder is what would be shared as a "repack"
-$FinalServerFolder = "D:\WOW_SERVERS\AzerothCore-by-Luke"
+$FinalServerFolder = "D:\AzerothCore-by-Luke"
+# Choose what you want the root SQL password to be.
+$SQLRootPassword = "123456"
+# Download Data files from Github? REMEMBER, This is a large file!
+# "Yes" to download maps data, "No" to skip maps data. If skipped remember to copy later
+$Downloaddata = "No"
 
 ########################################################################
 # !!!DO NOT EDIT BELOW THIS LINE UNLESS YOU KNOW WHAT YOU ARE DOING!!! #
@@ -32,8 +37,6 @@ $MySQLFileName = $MySQLURL.Split("/")[-1]
 $MySQLZipFile = "$env:USERPROFILE\Downloads\$MySQLFileName"
 $MySQLConnectorURL = "https://dev.mysql.com/get/Downloads/Connector-Net/mysql-connector-net-8.0.19.msi"
 $MySQLConnectorFileName = $MySQLConnectorURL.Split("/")[-1]
-$MySQLConnectorMSIFile = "$env:USERPROFILE\Downloads\$MySQLConnectorFileName"
-$MySQLConnectorDLLFile = "C:\Program Files (x86)\MySQL\MySQL Connector Net 8.0.19\Assemblies\v4.5.2\MySql.Data.dll"
 $HeidiURL = "https://www.heidisql.com/downloads/releases/HeidiSQL_10.3_64_Portable.zip"
 $HeidiFileName = $HeidiURL.Split("/")[-1]
 $HeidiZipFile = "$env:USERPROFILE\Downloads\$HeidiFileName"
@@ -85,8 +88,9 @@ if (!(Test-Path -Path "C:\Program Files\Git\git-cmd.exe")) {
     }
     Write-Information -MessageData "Git Install finished" -InformationAction Continue
     $RestartRequired = $true
+} else {
+    Write-Information -MessageData "Git already installed. Continuing to next step." -InformationAction Continue
 }
-Write-Information -MessageData "Git already installed. Continuing to next step." -InformationAction Continue
 
 # check for CMake 64bit install
 if (!(Test-Path -Path "C:\Program Files\CMake\bin\cmake.exe")) {
@@ -105,8 +109,9 @@ if (!(Test-Path -Path "C:\Program Files\CMake\bin\cmake.exe")) {
     }
     Write-Information -MessageData "CMake install finished" -InformationAction Continue
     $RestartRequired = $true
+} else {
+    Write-Information -MessageData "CMake already installed. Continuing to next step." -InformationAction Continue
 }
-Write-Information -MessageData "CMake already installed. Continuing to next step." -InformationAction Continue
 
 # check for Visual Studio
 if (!(Test-Path -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe")) {
@@ -131,8 +136,9 @@ if (!(Test-Path -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Commu
     }
     Write-Information -MessageData "Visual Studio install finished" -InformationAction Continue
     $RestartRequired = $true
+} else {
+    Write-Information -MessageData "Visual Studio already installed. Continuing to next step." -InformationAction Continue
 }
-Write-Information -MessageData "Visual Studio already installed. Continuing to next step." -InformationAction Continue
 
 # check for OpenSSL 64bit
 if (!(Test-Path -Path "C:\Program Files\OpenSSL-Win64\bin\openssl.exe")) {
@@ -151,8 +157,9 @@ if (!(Test-Path -Path "C:\Program Files\OpenSSL-Win64\bin\openssl.exe")) {
     }
     Write-Information -MessageData "OpenSSL 64bit install finished" -InformationAction Continue
     $RestartRequired = $true
+} else {
+    Write-Information -MessageData "OpenSSL already installed. Continuing to next step." -InformationAction Continue
 }
-Write-Information -MessageData "OpenSSL already installed. Continuing to next step." -InformationAction Continue
 
 # check for MySQL
 if (!(Test-Path -Path C:\MySQL\bin\mysqld.exe)) {
@@ -164,76 +171,19 @@ if (!(Test-Path -Path C:\MySQL\bin\mysqld.exe)) {
         Write-Information -MessageData "Failed to extract $MySQLFileName. Download may be corrupt. Delete and try again." -InformationAction Continue
         break
     }
-    Move-Item -Path "C:\MySQL\mysql-5.7.29-winx64\bin" -Destination "C:\MySQL"
-    Move-Item -Path "C:\MySQL\mysql-5.7.29-winx64\docs" -Destination "C:\MySQL"
-    Move-Item -Path "C:\MySQL\mysql-5.7.29-winx64\include" -Destination "C:\MySQL"
-    Move-Item -Path "C:\MySQL\mysql-5.7.29-winx64\lib" -Destination "C:\MySQL"
-    Move-Item -Path "C:\MySQL\mysql-5.7.29-winx64\share" -Destination "C:\MySQL"
-    Move-Item -Path "C:\MySQL\mysql-5.7.29-winx64\LICENSE" -Destination "C:\MySQL"
-    Move-Item -Path "C:\MySQL\mysql-5.7.29-winx64\README" -Destination "C:\MySQL"
+    Get-ChildItem -Path "C:\MySQL\mysql-5.7.29-winx64" | Move-Item -Destination "C:\MySQL"
+    New-Item -Path "C:\MySQL\lib\debug" -ItemType Directory -Force
+    Copy-Item -Path "C:\MySQL\lib\libmysql.lib" -Destination "C:\MySQL\lib\debug\libmysql.lib"
+    Copy-Item -Path "C:\MySQL\lib\libmysql.dll" -Destination "C:\MySQL\lib\debug\libmysql.dll"
     Remove-Item -Path "C:\MySQL\mysql-5.7.29-winx64" -Force
-}
-
-# check for MySQL Connector
-if (!(Test-Path -Path $MySQLConnectorDLLFile)) {
-    Write-Information -MessageData "Downloading and installing MySQL Connector." -InformationAction Continue
-    Try {
-        Invoke-WebRequest -Uri $MySQLConnectorURL -OutFile $MySQLConnectorMSIFile
-    } catch {
-        Write-Information -MessageData "Download failed for $MySQLConnectorFileName" -InformationAction Continue
-        break
-    }
-    $SQLConnectorArguments = "/i `"$MySQLConnectorMSIFile`" /norestart /quiet"
-    Try {
-        Start-Process msiexec.exe -ArgumentList $SQLConnectorArguments -Wait
-    } Catch {
-        Write-Information -MessageData "MySQL Connector Install failed" -ErrorAction Continue
-        break
-    }
-    $RestartRequired = $true
 } else {
-    Write-Information -MessageData "MySQL Connector already installed" -InformationAction Continue
+    Write-Information -MessageData "MySQL already exists at C:\MySQL" -InformationAction Continue
 }
-
-<#
-if (!(Test-Path -Path "C:\MySQL\lib\debug\libmysql.dll")) {
-    Write-Information -MessageData "MySQL dependencies not found. Downloading now" -InformationAction Continue
-    Try {
-        Invoke-WebRequest -Uri $MySQLDevFilesURL -OutFile "$env:USERPROFILE\Downloads\mysql_lib.zip"
-    } Catch {
-        Write-Error -Message "Failed to download mysql_lib.zip" -InformationAction Stop
-    }
-    Write-Information -MessageData "Download finished. Extracting files." -InformationAction Continue
-    Expand-Archive -Path "$env:USERPROFILE\Downloads\mysql_lib.zip" -DestinationPath "C:\MySQL"
-    New-Item -Path "C:\MySQL\lib\debug" -ItemType Directory
-    $SQLdeps = Get-ChildItem -Path "C:\MySQL\lib_64"
-    foreach ($SQLdep in $SQLdeps) {
-        $SQLdepname = $SQLdep.name
-        Copy-Item -Path "C:\MySQL\lib_64\$SQLdepname" -Destination "C:\MySQL\lib\debug\$SQLdepname"
-    }
-
-    # Set password for root account
-    Write-Information -MessageData "`n`n`nSQL default is BLANK root password`n`nProvide new password`n`n`n" -InformationAction Continue
-    do {
-        $NewSQLPassword = Read-Host "New Password"
-        $ConfirmPassword = Read-Host "Confirm Password"
-        if ($ConfirmPassword -ne $NewSQLPassword) {
-            Write-Information -MessageData "Passwords do not match. Try again" -InformationAction Continue
-        }
-    } until ($ConfirmPassword -eq $NewSQLPassword)
-
-    $sqlCMD = "ALTER USER 'root'@'localhost' IDENTIFIED BY '$ConfirmPassword';"
-    $SQLChangePWArgs = "-uroot --execute=`"$sqlCMD`""
-    Start-Process -FilePath 'C:\Program Files\MySQL\MySQL Server 5.7\bin\mysql.exe' -ArgumentList $SQLChangePWArgs -Wait -ErrorAction Stop
-    Write-Information -MessageData "Root password set to: $ConfirmPassword" -InformationAction Continue
-    $RestartRequired = $true
-#>
-
-Write-Information -MessageData "MySQL already installed. Continuing to next step." -InformationAction Continue
 
 # Program installation finished.  Restart now if required.
 if ($RestartRequired) {
-    Write-Information -MessageData "`n`n`nOne or more applications have been installed`nand PATH variables modified`nyou MUST close and reopen Powershell to continue`nrerun script to continue`n`n`n" -InformationAction Stop
+    Write-Information -MessageData "`n`n`nOne or more applications have been installed`nand PATH variables modified`nyou MUST close and reopen Powershell to continue`nrerun script to continue`n`n`n" -InformationAction Continue
+    Break
 }
 
 # Downloading AzerothCore Repository
@@ -433,86 +383,37 @@ if (Test-Path -Path $FinalServerFolder) {
 New-Item -Path $FinalServerFolder -ItemType Directory
 Move-Item -Path "$BuildFolder\bin\Release" -Destination "$FinalServerFolder\Server"
 
-# Copying required files and making setting changes
-Write-Progress -Activity "Copying all .conf.dist files"
+# Copy all conf.dist files to .conf
 $DistFiles = Get-ChildItem -Path "$FinalServerFolder\Server" -Filter "*.dist"
 foreach ($Dist in $DistFiles) {
     $Conf = $Dist -replace ".{5}$"
     Copy-Item -Path "$FinalServerFolder\Server\$Dist" -Destination "$FinalServerFolder\Server\$Conf"
 }
 
-# Copying server dependencies
-Copy-Item -Path 'C:\MySQL\lib\libmysql.dll' -Destination "$FinalServerFolder\Server"
-Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libcrypto-1_1-x64.dll" -Destination "$FinalServerFolder\Server"
-
 # Change .conf file settings
+New-Item -Path "$FinalServerFolder\Server\Data" -ItemType Directory
+New-Item -Path "$FinalServerFolder\Server\Logs" -ItemType Directory
 $WorldServerConf = Get-Content -Path "$FinalServerFolder\Server\worldserver.conf"
 $NewDataDir = $WorldServerConf -replace "DataDir = `".`"", "DataDir = `"Data`""
 $NewDataDir | Set-Content -Path "$FinalServerFolder\Server\worldserver.conf"
+$NewWorldServerConf = Get-Content -Path "$FinalServerFolder\Server\worldserver.conf"
+$NewLogDir = $NewWorldServerConf -replace "LogsDir = `".`"", "LogsDir = `"Logs`""
+$NewLogDir | Set-Content -Path "$FinalServerFolder\Server\worldserver.conf"
+$AuthServerConf = Get-Content -Path "$FinalServerFolder\Server\authserver.conf"
+$NewAuthLogDir = $AuthServerConf -replace "LogsDir = `"`"", "LogsDir = `"Logs`""
+$NewAuthLogDir | Set-Content -Path "$FinalServerFolder\Server\authserver.conf"
 
-# Create data folder and download from Git
-New-Item -Path "$BuildFolder\bin\Release\Data" -ItemType Directory
-[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing")
-[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
-
-$DataForm = New-Object System.Windows.Forms.Form
-$DataForm.Size = New-Object System.Drawing.Size(300,180)
-$DataForm.text ="AzerothCore Data files"
-$DataForm.StartPosition = 'CenterScreen'
-
-$DataOKButton = New-Object System.Windows.Forms.Button
-$DataOKButton.Location = New-Object System.Drawing.Point(65,100)
-$DataOKButton.Size = New-Object System.Drawing.Size(75,23)
-$DataOKButton.Text = 'Yes'
-$DataOKButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
-$DataForm.AcceptButton = $DataOKButton
-$DataForm.Controls.Add($DataOKButton)
-
-$DataCancelButton = New-Object System.Windows.Forms.Button
-$DataCancelButton.Location = New-Object System.Drawing.Point(150,100)
-$DataCancelButton.Size = New-Object System.Drawing.Size(75,23)
-$DataCancelButton.Text = 'No'
-$DataCancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
-$DataForm.CancelButton = $DataCancelButton
-$DataForm.Controls.Add($DataCancelButton)
-
-$DataFormText = New-Object System.Windows.Forms.Label
-$DataFormText.Location = New-Object System.Drawing.Point(30,30)
-$DataFormText.Size = New-Object System.Drawing.Size(260,70)
-$DataFormText.Font = New-Object System.Drawing.Font("Ariel", 14)
-$DataFormText.Text = 'Do you want to download data files from Github?'
-
-$DataForm.Controls.Add($DataFormText)
-
-$DataOKButton.Add_Click({
-    $Script:ManualData = $false
-    $DataForm.Hide()
+if ($Downloaddata -eq "Yes") {
     Write-Information -MessageData "Download is >1Gb so it will take some time.  Go have another beer!" -InformationAction Continue
-    <#
-    $AZCoreDataURL = "https://github.com/wowgaming/client-data/releases/download/v7/data.zip"
-    $AZCoreDataZipName = $AZCoreDataURL.Split("/")[-1]
-    $AZCoreDataZip = "$env:USERPROFILE\Downloads\$AZCoreDataZipName"
-    #>
-    Try {
-        Invoke-WebRequest -Uri $AZCoreDataURL -OutFile $AZCoreDataZip
-    } Catch {
-        Write-Error -Message "Failed to download $AZCoreDataZipName" -InformationAction Stop
-    }
-    Write-Information -MessageData "Extracting files should take long enough for you to have another beer. Enjoy!" -InformationAction Continue
-    Expand-Archive -Path $AZCoreDataZip -DestinationPath "$FinalServerFolder\Server\Data"
-
-    $DataForm.Close()
-})
-
-$DataCancelButton.Add_Click({
-    $Script:ManualData = $true
-    $DataForm.Close()
-})
-
-# Show Form
-$DataForm.ShowDialog() | Out-Null
-
-if ($ManualData -eq $true) {
+        Try {
+            Invoke-WebRequest -Uri $AZCoreDataURL -OutFile $AZCoreDataZip
+        } Catch {
+            Write-Error -Message "Failed to download $AZCoreDataZipName" -InformationAction Stop
+        }
+        Write-Information -MessageData "Extracting files should take long enough for you to have another beer. Enjoy!" -InformationAction Continue
+        Expand-Archive -Path $AZCoreDataZip -DestinationPath "$FinalServerFolder\Server\Data"
+}
+if ($Downloaddata -eq "No") {
     Write-Information -MessageData "`n`n!!Don't forget to manually copy data files!!`n`n" -InformationAction Continue
     Start-Sleep -Seconds 3
 }
@@ -533,21 +434,15 @@ foreach ($SQLBinFile in $SQLBinFilesToCopy) {
     Copy-Item -Path "$SQLBinFile" -Destination "$FinalServerFolder\Server\database\bin"
 }
 Copy-Item -Path "C:\MySQL\share" -Destination "$FinalServerFolder\Server\database" -Recurse
+Copy-Item -Path 'C:\MySQL\lib\libmysql.dll' -Destination "$FinalServerFolder\Server"
+Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libcrypto-1_1-x64.dll" -Destination "$FinalServerFolder\Server"
+
 
 # Initialize MySQL
+New-Item -Path "$FinalServerFolder\Server\database\tmp" -ItemType Directory
+New-Item -Path "$FinalServerFolder\Server\database\data" -ItemType Directory
 Set-Location "$FinalServerFolder\Server\database\bin"
 Start-Process -FilePath "mysqld.exe" -ArgumentList "--initialize-insecure" -Wait
-New-Item -Path "$FinalServerFolder\Server\database\tmp" -ItemType Directory
-
-# Get MySQL root pw
-Write-Information -MessageData "`n`n`nSQL default is BLANK root password`n`nProvide new password`n`n`n" -InformationAction Continue
-do {
-    $NewSQLPassword = Read-Host "New Password"
-    $ConfirmPassword = Read-Host "Confirm Password"
-    if ($ConfirmPassword -ne $NewSQLPassword) {
-        Write-Information -MessageData "Passwords do not match. Try again" -InformationAction Continue
-    }
-} until ($ConfirmPassword -eq $NewSQLPassword)
 
 # Create MySQLini
 $MySQLINI = "$FinalServerFolder\Server\database\my.ini"
@@ -556,14 +451,13 @@ $MySQLINI = "$FinalServerFolder\Server\database\my.ini"
     [client]
         default-character-set = utf8mb4
         port = 3306
-        socket = /tmp/mysql.soc
+        socket = /tmp/mysql.sock
 # MySQL 5.7.29 Settings
     [mysqld]
         port = 3306
         basedir=`"..`"
         datadir=`"../data`"
         socket = /tmp/mysql.sock
-        secure_file_priv=`"../tmp`"
         skip-external-locking
         skip_ssl
         skip-slave-start
@@ -600,7 +494,16 @@ $MySQLCNF = "$FinalServerFolder\Server\database\config.cnf"
     New-Item -Path $MySQLCNF -ItemType File -Force
     Add-Content -Path $MySQLCNF -Value "[client]
     user = root
-    password = $ConfirmPassword
+    password = $SQLRootPassword
+    host = 127.0.0.1
+    port = 3306"
+
+# Create MySQLUpdatecnf
+$MySQLCNF = "$FinalServerFolder\Server\database\mysqlupdate.cnf"
+    New-Item -Path $MySQLCNF -ItemType File -Force
+    Add-Content -Path $MySQLCNF -Value "[client]
+    user = root
+    password = $SQLRootPassword
     host = 127.0.0.1
     port = 3306"
 
@@ -608,7 +511,7 @@ $MySQLCNF = "$FinalServerFolder\Server\database\config.cnf"
 $MySQLbat = "$FinalServerFolder\start_mysql.bat"
 New-Item -Path $MySQLbat -ItemType File -Force
 Add-Content -Path $MySQLbat -Value "@echo off
-SET NAME=MyCustomServer - mysql-5.7.29-winx64
+SET NAME=MyCustomServer - mysql-5.6.46-winx64
 TITLE %NAME%
 
 echo.
@@ -624,10 +527,10 @@ Set-Location "$FinalServerFolder"
 Start-Process -FilePath "start_mysql.bat"
 
 # Set MySQL root pw
-$sqlCMD = "ALTER USER 'root'@'localhost' IDENTIFIED BY '$ConfirmPassword';"
+$sqlCMD = "ALTER USER 'root'@'localhost' IDENTIFIED BY '$SQLRootPassword';"
 $SQLChangePWArgs = "-uroot --execute=`"$sqlCMD`""
 Start-Process -FilePath "$FinalServerFolder\Server\database\bin\mysql.exe" -ArgumentList $SQLChangePWArgs -Wait -ErrorAction Stop
-Write-Information -MessageData "Root password set to: $ConfirmPassword" -InformationAction Continue
+Write-Information -MessageData "Root password set to: $SQLRootPassword" -InformationAction Continue
 
 # Create databases
 $CreateDBCMD = Get-Content -Path "$BaseLocation\data\sql\create\create_mysql.sql"
@@ -638,30 +541,23 @@ Start-Process -FilePath "$FinalServerFolder\Server\database\bin\mysql.exe" -Argu
 Function Import-SQLscripts {
     param (
         [Parameter(Mandatory = $true,Position = 0)]
-        [string]$SQLexe,
-        [Parameter(Mandatory = $true,Position = 1)]
-        [string]$SQLcnf,
-        [Parameter(Mandatory = $true,Position = 2)]
         [string]$SQLDatabase,
-        [Parameter(Mandatory = $true,Position = 3)]
+        [Parameter(Mandatory = $true,Position = 1)]
         [string]$SQLScriptsPath
     )
 
     $SQLscripts = Get-ChildItem -Path $SQLScriptsPath -Filter "*.sql"
     foreach ($SQLscript in $SQLscripts) {
         $SQLscriptpath = $SQLScriptsPath + "\" + $SQLscript
-        #$SQLscriptCMD = Get-Content -Path $SQLscriptpath
-        $SQLscriptArgs = "--defaults-file=$SQLcnf $SQLDatabase -e `"source $SQLscriptCMD`""
+        Write-Progress -Activity "Importing SQL Files for $SQLDatabase" -Status "$SQLscript"
         Try {
-            Start-Process -FilePath $SQLexe -ArgumentList $SQLscriptArgs -Wait
+            Get-Content $SQLscriptpath | &".\mysql.exe" --defaults-file=..\config.cnf $SQLDatabase 
         } catch {
-            Write-Information -MessageData "$SQLscriptpath failed to run" -InformationAction Continue
+            Write-Information -MessageData "$SQLscriptpath failed to import" -InformationAction Continue
         }
     }
 }
-
-$SQLexe = "$FinalServerFolder\Server\database\bin\mysql.exe"
-$SQLcnf = "$FinalServerFolder\Server\database\config.cnf"
+Set-Location -Path "$FinalServerFolder\Server\database\bin"
 $authDBScriptsPath = "$BaseLocation\data\sql\base\db_auth"
 $authDBupdateScriptsPath = "$BaseLocation\data\sql\updates\db_auth"
 $characterDBScriptsPath = "$BaseLocation\data\sql\base\db_characters"
@@ -669,15 +565,57 @@ $characterDBupdateScriptsPath = "$BaseLocation\data\sql\updates\db_characters"
 $worldDBScriptsPath = "$BaseLocation\data\sql\base\db_world"
 $worldDBupdateScriptsPath = "$BaseLocation\data\sql\updates\db_world"
 
-Import-SQLscripts -SQLexe $SQLexe -SQLcnf $SQLcnf -SQLDatabase "acore_auth" -SQLScriptsPath $authDBScriptsPath
-Import-SQLscripts -SQLexe $SQLexe -SQLcnf $SQLcnf -SQLDatabase "acore_auth" -SQLScriptsPath $authDBupdateScriptsPath
-Import-SQLscripts -SQLexe $SQLexe -SQLcnf $SQLcnf -SQLDatabase "acore_characters" -SQLScriptsPath $characterDBScriptsPath
-Import-SQLscripts -SQLexe $SQLexe -SQLcnf $SQLcnf -SQLDatabase "acore_characters" -SQLScriptsPath $characterDBupdateScriptsPath
-Import-SQLscripts -SQLexe $SQLexe -SQLcnf $SQLcnf -SQLDatabase "acore_world" -SQLScriptsPath $worldDBScriptsPath
-Import-SQLscripts -SQLexe $SQLexe -SQLcnf $SQLcnf -SQLDatabase "acore_world" -SQLScriptsPath $worldDBupdateScriptsPath
+Import-SQLscripts -SQLDatabase "acore_auth" -SQLScriptsPath $authDBScriptsPath
+Import-SQLscripts -SQLDatabase "acore_auth" -SQLScriptsPath $authDBupdateScriptsPath
+Import-SQLscripts -SQLDatabase "acore_characters" -SQLScriptsPath $characterDBScriptsPath
+Import-SQLscripts -SQLDatabase "acore_characters" -SQLScriptsPath $characterDBupdateScriptsPath
+Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBScriptsPath
+Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBupdateScriptsPath
+
+# Import SQL scripts from modules
+$InstalledModules = Get-ChildItem -Path "$BaseLocation\modules" -Filter "mod*"
+foreach ($InstalledModule in $InstalledModules) {
+    Write-Progress -Activity "Importing SQL files from installed modules" -Status "$InstalledModule"
+    $Modfiles = Get-ChildItem -Path "$BaseLocation\modules\$InstalledModule" -Recurse -Filter "*.sql"
+    foreach ($Modfile in $Modfiles) {
+        $Modpath = $Modfile.FullName
+        $SQLDatabase = $false
+        if (($Modpath -like "*character*") -and ($Modpath -notlike "*world*") -and ($Modpath -notlike "*auth*")) {
+            $SQLDatabase = "acore_characters"
+        } elseif (($Modpath -like "*world*") -and ($Modpath -notlike "*auth*") -and ($Modpath -notlike "*characters*")) {
+            $SQLDatabase = "acore_world"
+        } elseif (($Modpath -like "*auth*") -and ($Modpath -notlike "*world*") -and ($Modpath -notlike "*characters*")) {
+            $SQLDatabase = "acore_auth"
+        } else {
+            $SQLDatabase = $false
+        }
+        if ($SQLDatabase -eq $false) {
+            Write-Information -MessageData "`n`nCan not determine database for $Modpath" -InformationAction Continue
+            Write-Information -MessageData "Provide database sql script should be applied to`nuse format `"auth`", `"characters`", or `"world`"`n" -InformationAction Continue
+            do {
+                $SQLDatabase = Read-Host -Prompt "database for this SQL script?"
+            } until (($SQLDatabase -eq "auth") -or ($SQLDatabase -eq "characters") -or ($SQLDatabase -eq "world"))
+            if ($SQLDatabase -eq "auth") {
+                $SQLDatabase = "acore_auth"
+            }
+            if ($SQLDatabase -eq "character") {
+                $SQLDatabase = "acore_characters"
+            }
+            if ($SQLDatabase -eq "world") {
+                $SQLDatabase = "acore_world"
+            }
+        }
+        Try {
+            #Write-Host "$Modpath installing to $SQLDatabase"
+            Get-Content $Modpath | &".\mysql.exe" --defaults-file=..\config.cnf $SQLDatabase 
+        } catch {
+            Write-Information -MessageData "$Modpath failed to import" -InformationAction Continue
+        }
+    }
+}
 
 # Stop SQL server after database configuration
-Start-Process -FilePath "$FinalServerFolder\Server\database\bin\mysqladmin.exe" -ArgumentList "--user=root --password=$ConfirmPassword shutdown"
+Start-Process -FilePath "$FinalServerFolder\Server\database\bin\mysqladmin.exe" -ArgumentList "--user=root --password=$SQLRootPassword shutdown"
 
 # Download HeidiSQL
 $HeidiURL = "https://www.heidisql.com/downloads/releases/HeidiSQL_10.3_64_Portable.zip"
@@ -694,36 +632,26 @@ Expand-Archive -Path $HeidiZipFile -DestinationPath "$FinalServerFolder\Tools\He
 $WorldServerbat = "$FinalServerFolder\start_worldserver.bat"
 New-Item -Path $WorldServerbat -ItemType File -Force
 Add-Content -Path $WorldServerbat -Value "@echo off
-REM ###################################################################################################################
-REM   /@@@@@@                                            /@@     /@@        /@@@@@@                                  
-REM  /@@__  @@                                          | @@    | @@       /@@__  @@                                 
-REM | @@  \ @@ /@@@@@@@@  /@@@@@@   /@@@@@@   /@@@@@@  /@@@@@@  | @@@@@@$ | @@  \__/  /@@@@@@   /@@@@@@   /@@@@@@    
-REM | @@@@@@@@|____ /@@/ /@@__  @@ /@@__  @@ /@@__  @@|_  @@_/  | @@__  @@| @@       /@@__  @@ /@@__  @@ /@@__  @@   
-REM | @@__  @@   /@@@@/ | @@@@@@@@| @@  \__/| @@  \ @@  | @@    | @@  \ @@| @@      | @@  \ @@| @@  \__/| @@@@@@@@   
-REM | @@  | @@  /@@__/  | @@_____/| @@      | @@  | @@  | @@ /@@| @@  | @@| @@    @@| @@  | @@| @@      | @@_____/   
-REM | @@  | @@ /@@@@@@@@|  @@@@@@$| @@      |  @@@@@@/  |  @@@@/| @@  | @@|  @@@@@@/|  @@@@@@/| @@      |  @@@@@@@   
-REM |__/  |__/|________/ \_______/|__/       \______/    \___/  |__/  |__/ \______/  \______/ |__/       \_______/   
-REM
-REM
-REM  /@@      /@@                     /@@       /@@        /@@@@@@                                                   
-REM | @@  /@ | @@                    | @@      | @@       /@@__  @@                                                  
-REM | @@ /@@@| @@  /@@@@@@   /@@@@@@ | @@  /@@@@@@$      | @@  \__/  /@@@@@@   /@@@@@@  /@@    /@@ /@@@@@@   /@@@@@@ 
-REM | @@/@@ @@ @@ /@@__  @@ /@@__  @@| @@ /@@__  @@      |  @@@@@@  /@@__  @@ /@@__  @@|  @@  /@@//@@__  @@ /@@__  @@
-REM | @@@@_  @@@@| @@  \ @@| @@  \__/| @@| @@  | @@       \____  @@| @@@@@@@@| @@  \__/ \  @@/@@/| @@@@@@@@| @@  \__/
-REM | @@@/ \  @@@| @@  | @@| @@      | @@| @@  | @@       /@@  \ @@| @@_____/| @@        \  @@@/ | @@_____/| @@      
-REM | @@/   \  @@|  @@@@@@/| @@      | @@|  @@@@@@@      |  @@@@@@/|  @@@@@@@| @@         \  @/  |  @@@@@@@| @@      
-REM |__/     \__/ \______/ |__/      |__/ \_______/       \______/  \_______/|__/          \_/    \_______/|__/      
-REM                             This server was autocompiled using Windows PowerShell
-REM                        https://github.com/stoudtlr/AzerothCore-Windows-AutoBuilder.git
-REM ###################################################################################################################                                                                                                                
-
-SET NAME=$FinalServerName - worldserver.exe
-TITLE %NAME%
-
 echo.
+echo This server was autocompiled using Windows PowerShell
+echo https://github.com/stoudtlr/AzerothCore-Windows-AutoBuilder.git
 echo.
-echo Starting worldserver. Press CTRL C for server shutdown
-echo.
+echo Starting authserver. Press CTRL C for server shutdown
 echo.
 cd .\Server
 start worldserver.exe"
+
+# Create authserver.bat
+$AuthServerbat = "$FinalServerFolder\start_authserver.bat"
+New-Item -Path $AuthServerbat -ItemType File -Force
+Add-Content -Path $AuthServerbat -Value "@echo off
+echo.
+echo This server was autocompiled using Windows PowerShell
+echo https://github.com/stoudtlr/AzerothCore-Windows-AutoBuilder.git
+echo.
+echo Starting authserver. Press CTRL C for server shutdown
+echo.
+cd .\Server
+start authserver.exe"
+
+Write-Information -MessageData "`n`nServer finished! Go to $FinalServerFolder and run SQL,Auth, and World bat files to launch your server" -InformationAction Continue
