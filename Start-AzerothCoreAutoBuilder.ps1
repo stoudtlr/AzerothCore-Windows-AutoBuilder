@@ -91,6 +91,7 @@ do {
                     Break
                 }
                 Expand-Archive -Path $HeidiZipFile -DestinationPath "$DownloadFolder\HeidiSQL"
+                Start-Sleep -Seconds 2
             }
             # check for Git 64bit install
             if (!(Test-Path -Path "C:\Program Files\Git\git-cmd.exe")) {
