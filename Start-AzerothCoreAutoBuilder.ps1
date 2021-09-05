@@ -23,7 +23,7 @@ $AZCoreDataURL = "https://github.com/wowgaming/client-data/releases/download/v11
 # This is only used if the "Create Repack" option is used
 # You MUST do this if you plan to play on your built server.
 # Otherwise all characters and progress are wiped next time you build a server
-$PersonalServerFolder = "D:\AzerothCore-by-Luke-TEST"
+$PersonalServerFolder = "D:\AzerothCore-by-Luke"
 
 ###############################################
 ##      DO NOT EDIT ANYTHING BELOW THIS      ##
@@ -591,11 +591,13 @@ do {
                 Copy-Item -Path "$BuildFolder\bin\Release\configs\$Dist" -Destination "$BuildFolder\bin\Release\configs\$Conf"
             }
 
-            # Copy all conf.dist files from mods to .conf
-            $ModDistFiles = Get-ChildItem -Path "$BuildFolder\bin\Release\configs\modules" -Filter "*.dist"
-            foreach ($moddist in $ModDistFiles) {
-                $Conf = $moddist -replace ".{5}$"
-                Copy-Item -Path "$BuildFolder\bin\Release\configs\modules\$moddist" -Destination "$BuildFolder\bin\Release\configs\modules\$Conf"
+            # Copy all conf.dist files from mods to .conf if modules are found
+            if (Test-Path -path "$BuildFolder\bin\Release\configs\modules") {
+                $ModDistFiles = Get-ChildItem -Path "$BuildFolder\bin\Release\configs\modules" -Filter "*.dist"
+                foreach ($moddist in $ModDistFiles) {
+                    $Conf = $moddist -replace ".{5}$"
+                    Copy-Item -Path "$BuildFolder\bin\Release\configs\modules\$moddist" -Destination "$BuildFolder\bin\Release\configs\modules\$Conf"
+                }
             }
 
             # Change .conf file settings
