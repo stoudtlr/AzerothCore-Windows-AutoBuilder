@@ -297,7 +297,7 @@ do {
                 Write-Information -MessageData "`n`n`nOne or more applications have been installed`nand PATH variables modified`nyou MUST close and reopen Powershell to continue`nrerun script to continue`n`n`n" -InformationAction Continue
                 Break
             } else {
-               Clear-Host
+               #Clear-Host
                 Write-Information -MessageData "All prerequisite software already installed and configured." -InformationAction Continue
             }
         }
@@ -383,7 +383,7 @@ do {
                 }
 
             }
-            Clear-Host
+            #Clear-Host
             Write-Information -MessageData "AzerothCore cloned and/or cleaned.  You may now build server or download PR to test" -InformationAction Continue
         }
         #Download PR to Test
@@ -428,7 +428,7 @@ do {
                 } Catch {
                     throw
                 }
-                Clear-Host
+                #Clear-Host
                 Write-Information -MessageData "PR# $PR has been pulled.  You may now build server" -InformationAction Continue
 
             }
@@ -572,10 +572,12 @@ do {
                 Remove-Item (Join-Path $BuildFolder "\bin\Release") -Recurse -Force
             }
             #Build Server
+			
+	
             Set-Location 'C:\Program Files\CMake\bin'
             Write-Progress -Activity "Building Server" -Status "Compiling Source"
             Write-Information -MessageData "Compiling and building will take some time. Go have a beer!" -InformationAction Continue
-            $BuildArgs = "-G 'Visual Studio 16 2019' -A x64 -DTOOLS=1 -S $BaseLocation -B $BuildFolder"
+            $BuildArgs = "-G ""Visual Studio 16 2019"" -A x64 -DTOOLS=1 -S $BaseLocation -B $BuildFolder"
             Start-Process -FilePath 'C:\Program Files\CMake\bin\cmake.exe' -ArgumentList $BuildArgs -Wait
             Write-Progress -Activity "Building Server" -Status "Final Build"
             $FinalArgs = "--build $BuildFolder --config Release"
