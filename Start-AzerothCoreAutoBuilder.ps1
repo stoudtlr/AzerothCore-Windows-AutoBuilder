@@ -1,13 +1,13 @@
 #DefaultLocations
 
 #Location that install executables for Cmake, Git, etc will be installed
-$DownloadFolder = "D:\WowServer\ACdownloads\"
+$DownloadFolder = "C:\WowServer\ACdownloads\"
 
 # BaseLocation is where all of the .git repositories will be downloaded
-$BaseLocation = "D:\WowServer\SourceGit\"
+$BaseLocation = "C:\WowServer\SourceGit\"
 
 # BuildFolder is where all those repositories will be compiled
-$BuildFolder = "D:\WowServer\Compile\"
+$BuildFolder = "C:\WowServer\Compile\"
 
 # Choose what you want the root SQL password to be.This should be a strong password.
 $SQLRootPassword = "123456"
@@ -15,7 +15,7 @@ $SQLRootPassword = "123456"
 # Download maps data from Github? REMEMBER, This is a large file!
 # "Yes" to download maps data, "No" to skip maps data. If skipped remember to manually extract files
 $Downloaddata = "Yes"
-$AZCoreDataURL = "https://github.com/wowgaming/client-data/releases/download/v11/data.zip"
+$AZCoreDataURL = "https://github.com/wowgaming/client-data/releases/download/v12/data.zip"
 
 # PersonalServerFolder is where your finished product will be if you choose Option 6 to create your own custom server or repack.
 # This folder contains all required files to run your server.
@@ -23,7 +23,7 @@ $AZCoreDataURL = "https://github.com/wowgaming/client-data/releases/download/v11
 # This is only used if the "Create Repack" option is used
 # You MUST do this if you plan to play on your built server.
 # Otherwise all characters and progress are wiped next time you build a server
-$PersonalServerFolder = "D:\WowServer\Server\"
+$PersonalServerFolder = "C:\WowServer\Server\"
 
 ###############################################
 ##      DO NOT EDIT ANYTHING BELOW THIS      ##
@@ -73,10 +73,6 @@ do {
             $BoostURL = "https://sourceforge.net/projects/boost/files/boost-binaries/1.74.0/boost_1_74_0-msvc-14.2-64.exe/download"
             $BoostFileName = $BoostURL.Split("/")[-2]
             $BoostInstallFile = "$DownloadFolder\$BoostFileName"
-
-            $AZCoreDataURL = "https://github.com/wowgaming/client-data/releases/download/v11/data.zip"
-            $AZCoreDataZipName = $AZCoreDataURL.Split("/")[-1]
-            $AZCoreDataZip = Join-Path $DownloadFolder "$AZCoreDataZipName"
 
             # Pre-requisite checks section
             Write-Information -MessageData "Beginning pre-requisite checks and`ninstalling any missing but required software`n`n" -InformationAction Continue
@@ -279,18 +275,14 @@ do {
                 Set-Location -path "C:\local\boost_1_74_0"
                 Start-Process -FilePath ".\bootstrap.bat" -Wait -NoNewWindow
                 Start-Process -FilePath ".\b2.exe" -Wait
-                #Start-Process -FilePath "C:\local\boost_1_74_0\bootstrap.bat" -Wait
-                #Start-Process -FilePath "C:\local\boost_1_74_0\tools\build\src\engine\b2.exe" -Wait
             } else {
                 Write-Information -MessageData "Bootstrap already ran" -InformationAction Continue
             }
             
-
             # set Boost environment variable
             $EnvName = "BOOST_ROOT"
             $EnvValue = "C:/local/boost_1_74_0"
             [System.Environment]::SetEnvironmentVariable($EnvName, $EnvValue, [System.EnvironmentVariableTarget]::Machine)
-
 
             # Program installation finished.  Restart now if required.
             if ($RestartRequired) {
@@ -332,7 +324,6 @@ do {
                 if (Test-Path 	(Join-Path $BaseLocation "\data\sql\updates")) {
                     Remove-Item (Join-Path $BaseLocation "\data\sql\updates") -Recurse -Force
                 }
-                #Remove-Item -path "$BaseLocation\.git\refs" -Recurse -Force
                 Set-Location $BaseLocation
                 
                 Try {
@@ -430,9 +421,9 @@ do {
                 }
                 Clear-Host
                 Write-Information -MessageData "PR# $PR has been pulled.  You may now build server" -InformationAction Continue
-
             }
         }
+
         #Add custom modules
         '4' {
             Function Get-AZModule {
@@ -469,7 +460,6 @@ do {
             }
 
             # Winform to select modules
-
             [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing")
             [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
 
@@ -565,15 +555,16 @@ do {
                 break
             }
         }
+
         #Build Server and database
         '5' {
             #Deletes old files, to include databases, to ensure clean build
             if (Test-Path  (Join-Path $BuildFolder "\bin\Release")) {
-                Remove-Item (Join-Path $BuildFolder "\bin\Release") -Recurse -Force
+                Get-ChildItem -path (Join-Path $BuildFolder "\bin\Release") -Recurse -Exclude *.m2, *.dbc, *.map, *.mmap, *.mmtile, *.vmtree, *.vmtile, *.vmo | Where-Object {!($_.PSIsContainer)} | Remove-Item -Force
+                Get-ChildItem -path (Join-Path $BuildFolder "\bin\Release") -Exclude "Data" | Remove-Item -Recurse -Force
             }
+
             #Build Server
-			
-	
             Set-Location 'C:\Program Files\CMake\bin'
             Write-Progress -Activity "Building Server" -Status "Compiling Source"
             Write-Information -MessageData "Compiling and building will take some time. Go have a beer!" -InformationAction Continue
@@ -606,10 +597,9 @@ do {
                 }
             }
 
-
             # Change .conf file settings
-            New-Item (Join-Path $BuildFolder "\bin\Release\Data") -ItemType Directory
-            New-Item (Join-Path $BuildFolder "\bin\Release\Logs") -ItemType Directory
+            New-Item (Join-Path $BuildFolder "\bin\Release\Data") -ItemType Directory -ErrorAction SilentlyContinue
+            New-Item (Join-Path $BuildFolder "\bin\Release\Logs") -ItemType Directory -ErrorAction SilentlyContinue
             #World Config
             $WorldServerConf = Get-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
             $NewWorldDataDir = $WorldServerConf -replace "DataDir = `".`"", "DataDir = `"Data`""
@@ -630,15 +620,17 @@ do {
 
             $AuthServerConf = Get-Content (Join-Path $BuildFolder "\bin\Release\configs\authserver.conf")
             $NewAuthSQLExe = $AuthServerConf -replace "MySQLExecutable = `"`"", "MySQLExecutable = `".\database\bin\mysql.exe`""
-            #$NewAuthSQLExe = $AuthServerConf -replace "MySQLExecutable = `"`"", "MySQLExecutable = `"$BuildFolder\bin\Release\database\bin\mysql.exe`""
             $NewAuthSQLExe | Set-Content (Join-Path $BuildFolder "\bin\Release\configs\authserver.conf")
 
             #Maps Data
-            
-
             if ($Downloaddata -eq "Yes") {
+                $AZCoreDataZipName = $AZCoreDataURL.Split("/")[-1]
+                $AZCoreDataZip = Join-Path $DownloadFolder "$AZCoreDataZipName"
                 Write-Information -MessageData "Download is >1Gb so it will take some time.  Go have another beer!" -InformationAction Continue
                 if (!(Test-Path -path $AZCoreDataZip)) {
+                    if (!(Test-Path -path $DownloadFolder)) {
+                        New-Item -path $DownloadFolder -ItemType Directory -Force
+                    }
                     Try {
 						Start-BitsTransfer -Source $AZCoreDataURL -Destination $AZCoreDataZip
                   
@@ -650,11 +642,10 @@ do {
                 } else {
                     Write-Information -MessageData "$AZCoreDataZipName was previously downloaded. Delete file and rerun if you need a new version downloaded" -InformationAction Continue
                 }
-                Write-Information -MessageData "Extracting files should take long enough for you to have another beer. Enjoy!" -InformationAction Continue
                 $datapaths = Join-Path $BuildFolder "\bin\Release\Data"
                 if ((!(Test-Path -path "$datapaths\Cameras")) -or (!(Test-Path -path "$datapaths\dbc")) -or (!(Test-Path -path "$datapaths\maps")) -or (!(Test-Path -path "$datapaths\mmaps")) -or (!(Test-Path -path "$datapaths\vmaps"))) {
-                 Add-Type -assembly “system.io.compression.filesystem”
-           		[System.IO.Compression.ZipFile]::ExtractToDirectory(($AZCoreDataZip), (Join-Path $BuildFolder "\bin\Release\Data\"))
+                    Write-Information -MessageData "Extracting files should take long enough for you to have another beer. Enjoy!" -InformationAction Continue
+                    Expand-Archive -Path $AZCoreDataZip -DestinationPath "$BuildFolder\bin\Release\Data"
                 } else {
                     Write-Information -MessageData "Skipping. Maps data previously extracted."
                 }
@@ -664,7 +655,7 @@ do {
             }
 
             #Copy SQL and Build Database. SQL is copied to ensure nothing is deleted or altered from main MySQL install in case program is also used for something else
-            New-Item (Join-Path $BuildFolder "\bin\Release\database\bin") -ItemType Directory
+            New-Item (Join-Path $BuildFolder "\bin\Release\database\bin") -ItemType Directory -ErrorAction SilentlyContinue
             $SQLBinFilesToCopy = @(
                 "C:\MySQL\lib\libmysql.dll"
                 "C:\MySQL\lib\libmysqld.dll"
@@ -678,7 +669,7 @@ do {
             foreach ($SQLBinFile in $SQLBinFilesToCopy) {
                 Copy-Item -Path "$SQLBinFile" -Destination (Join-Path $BuildFolder "\bin\Release\database\bin")
             }
-            Copy-Item -Path "C:\MySQL\share" -Destination (Join-Path $BuildFolder "\bin\Release\database") -Recurse
+            Copy-Item -Path "C:\MySQL\share" -Destination (Join-Path $BuildFolder "\bin\Release\database") -Recurse -ErrorAction SilentlyContinue
             Copy-Item -Path 'C:\MySQL\lib\libmysql.dll' -Destination (Join-Path $BuildFolder "\bin\Release\")
             Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libcrypto-1_1-x64.dll" -Destination (Join-Path $BuildFolder "\bin\Release\")
             Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libssl-1_1-x64.dll" -Destination (Join-Path $BuildFolder "\bin\Release\")
@@ -687,8 +678,8 @@ do {
             Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libssl-1_1-x64.dll" -Destination (Join-Path $BuildFolder "\bin\Release\configs\")
 
             # Initialize MySQL
-            New-Item -Path "$BuildFolder\bin\Release\database\tmp" -ItemType Directory
-            New-Item -Path "$BuildFolder\bin\Release\database\data" -ItemType Directory
+            New-Item -Path "$BuildFolder\bin\Release\database\tmp" -ItemType Directory -ErrorAction SilentlyContinue
+            New-Item -Path "$BuildFolder\bin\Release\database\data" -ItemType Directory -ErrorAction SilentlyContinue
             Set-Location "$BuildFolder\bin\Release\database\bin"
             Start-Process -FilePath "mysqld.exe" -ArgumentList "--initialize-insecure" -Wait
 
@@ -900,6 +891,7 @@ do {
 
             Write-Information -MessageData "Server and database build has finished!`nYou may now choose '6' to start the server for testing`nor choose '7' to move the files to another location`nif this will be a personal server or a repack" -InformationAction Continue
         }
+
         #Start Server
         '6' {
             Write-Information -MessageData "Remember that this should only be used for testing PR's!`nDo not play a solo server or host from here`nThese files are automatically deleted on rebuild`nto ensure clean testing environment`nChoose '7' if you want a permanent personal server to play on" -InformationAction Continue
@@ -914,6 +906,7 @@ do {
             Break
 
         }
+
         #Create Repack
         '7' {
             if (Test-Path -path "$PersonalServerFolder\Server\worldserver.exe") {
@@ -961,9 +954,7 @@ do {
 
             Write-Information -MessageData "Finished creating repack/personal server`nFiles can be found here:`n$PersonalServerFolder" -InformationAction Continue
             Write-Information -MessageData "You can start your server by double-clicking the filed named:`nStart_WoW_Server.bat" -InformationAction Continue
-            Write-Information -MessageData "Entire folder can be zipped and shared as well" -InformationAction Continue
-
-            
+            Write-Information -MessageData "Entire folder can be zipped and shared as well" -InformationAction Continue  
         }
     
     }
