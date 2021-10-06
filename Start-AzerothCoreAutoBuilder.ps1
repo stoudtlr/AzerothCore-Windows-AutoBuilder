@@ -1,13 +1,13 @@
-﻿#DefaultLocations
+#DefaultLocations
 
 #Location that install executables for Cmake, Git, etc will be installed
-$DownloadFolder = "C:\ACdownloads"
+$DownloadFolder = "D:\WowServer\ACdownloads\"
 
 # BaseLocation is where all of the .git repositories will be downloaded
-$BaseLocation = "C:\AzerothCore-WotLK"
+$BaseLocation = "D:\WowServer\SourceGit\"
 
 # BuildFolder is where all those repositories will be compiled
-$BuildFolder = "C:\Build"
+$BuildFolder = "D:\WowServer\Compile\"
 
 # Choose what you want the root SQL password to be.This should be a strong password.
 $SQLRootPassword = "123456"
@@ -23,7 +23,7 @@ $AZCoreDataURL = "https://github.com/wowgaming/client-data/releases/download/v11
 # This is only used if the "Create Repack" option is used
 # You MUST do this if you plan to play on your built server.
 # Otherwise all characters and progress are wiped next time you build a server
-$PersonalServerFolder = "D:\AzerothCore-by-Luke"
+$PersonalServerFolder = "D:\WowServer\Server\"
 
 ###############################################
 ##      DO NOT EDIT ANYTHING BELOW THIS      ##
@@ -76,7 +76,7 @@ do {
 
             $AZCoreDataURL = "https://github.com/wowgaming/client-data/releases/download/v11/data.zip"
             $AZCoreDataZipName = $AZCoreDataURL.Split("/")[-1]
-            $AZCoreDataZip = "$DownloadFolder\$AZCoreDataZipName"
+            $AZCoreDataZip = Join-Path $DownloadFolder "$AZCoreDataZipName"
 
             # Pre-requisite checks section
             Write-Information -MessageData "Beginning pre-requisite checks and`ninstalling any missing but required software`n`n" -InformationAction Continue
@@ -84,7 +84,7 @@ do {
             if (!(Test-Path -path $HeidiZipFile)) {
                 Write-Information -MessageData "HeidiSQL not found. Downloading now" -InformationAction Continue
                 Try {
-                    Invoke-WebRequest -Uri $HeidiURL -OutFile $HeidiZipFile
+					Start-BitsTransfer -Source $HeidiURL -Destination $HeidiZipFile
                 } Catch {
                     $fail = $_.Exception.Response.StatusCode.Value__
                     Write-Information -Message "Failed to download $HeidiFileName with error message: $fail" -InformationAction Continue
@@ -98,6 +98,7 @@ do {
                 Write-Information -MessageData "Git 64bit not found.  Downloading now" -InformationAction Continue
                 $GitVersion = Invoke-RestMethod -Method Get -Uri $GitURL | ForEach-Object assets | Where-Object name -like "*64-bit.exe"
                 Try {
+					$ProgressPreference = 'SilentlyContinue' 
                     $response = Invoke-WebRequest -Uri $GitVersion.browser_download_url -OutFile $GitInstallFile
                 } Catch {
                     $fail = $_.Exception.Response.StatusCode.Value__
@@ -144,6 +145,7 @@ do {
             if (!(Test-Path -Path "C:\Program Files\CMake\bin\cmake.exe")) {
                 Write-Information -MessageData "CMake 64bit not found. Downloading now" -InformationAction Continue
                 Try {
+					$ProgressPreference = 'SilentlyContinue' 
                     $Response = Invoke-WebRequest -Uri $CmakeVersion -OutFile $CmakeInstallFile
                 } Catch {
                     $fail = $_.Exception.Response.StatusCode.Value__
@@ -167,6 +169,7 @@ do {
             if (!(Test-Path -Path "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe")) {
                 Write-Information -MessageData "Visual Studio not found. Downloading and installing now" -InformationAction Continue
                 Try {
+					$ProgressPreference = 'SilentlyContinue' 
                     $Response = Invoke-WebRequest -Uri $VisualStudioURL -OutFile "$VSInstallFile.txt"
                 } Catch {
                     $fail = $_.Exception.Response.StatusCode.Value__
@@ -221,7 +224,8 @@ do {
             if (!(Test-Path -Path C:\MySQL\bin\mysqld.exe)) {
                 Write-Information -MessageData "Downloading MySQL Portable and expanding archive`nIf you're sitting here staring at the screen...`nit's time to get a beer!" -InformationAction Continue
                 Try {
-                    $Response = Invoke-WebRequest -Uri $MySQLURL -OutFile $MySQLZipFile
+					Start-BitsTransfer -Source $MySQLURL -Destination $MySQLZipFile
+                    
                 } catch {
                     $fail = $_.Exception.Response.StatusCode.Value__
                     Write-Information -Message "Failed to download $MySQLFileName with error message: $fail" -InformationAction Continue
@@ -293,7 +297,7 @@ do {
                 Write-Information -MessageData "`n`n`nOne or more applications have been installed`nand PATH variables modified`nyou MUST close and reopen Powershell to continue`nrerun script to continue`n`n`n" -InformationAction Continue
                 Break
             } else {
-                Clear-Host
+               Clear-Host
                 Write-Information -MessageData "All prerequisite software already installed and configured." -InformationAction Continue
             }
         }
@@ -308,7 +312,8 @@ do {
                     Write-Error -Message "Unable to create folder. Ensure valid path was used and retry" -ErrorAction Stop
                 }
             }
-            if (!(Test-Path -Path "$BaseLocation\.git\HEAD")) {
+			$gitpath = Join-Path $BaseLocation "\\.git\HEAD"
+            if (!(Test-Path $gitpath)) {
                 Write-Information -MessageData "Cloning AzerothCore Git Repo" -InformationAction Continue
                 Try {
                     git clone $AzerothCoreRepo $BaseLocation --branch master
@@ -321,11 +326,11 @@ do {
                 Write-Information -MessageData "Clone successfull!" -InformationAction Continue
             } else {
                 Write-Information -MessageData "AzerothCore already exists`nWill clean and update repo now" -InformationAction Continue
-                if (Test-Path -path "$BaseLocation\modules") {
-                    Remove-Item -path "$BaseLocation\modules" -Recurse -Force
+                if (Test-Path (Join-Path $BaseLocation "\modules")) {
+                    Remove-Item (Join-Path $BaseLocation "\modules") -Recurse -Force
                 }
-                if (Test-Path -path "$BaseLocation\data\sql\updates") {
-                    Remove-Item -path "$BaseLocation\data\sql\updates" -Recurse -Force
+                if (Test-Path 	(Join-Path $BaseLocation "\data\sql\updates")) {
+                    Remove-Item (Join-Path $BaseLocation "\data\sql\updates") -Recurse -Force
                 }
                 #Remove-Item -path "$BaseLocation\.git\refs" -Recurse -Force
                 Set-Location $BaseLocation
@@ -346,7 +351,7 @@ do {
                 } Catch {
                     throw
                 }
-                $PRLocalBranches = (Get-ChildItem -path "$BaseLocation\.git\refs\heads" -exclude "master").name
+                $PRLocalBranches = (Get-ChildItem (Join-Path $BaseLocation ".git\refs\heads") -exclude "master").name
                 foreach ($PRLocalBranch in $PRLocalBranches) {
                     Write-Information -MessageData "Deleting local branch $PRLocalBranch"
                     Try {
@@ -378,7 +383,7 @@ do {
                 }
 
             }
-            #Clear-Host
+            Clear-Host
             Write-Information -MessageData "AzerothCore cloned and/or cleaned.  You may now build server or download PR to test" -InformationAction Continue
         }
         #Download PR to Test
@@ -563,21 +568,23 @@ do {
         #Build Server and database
         '5' {
             #Deletes old files, to include databases, to ensure clean build
-            if (Test-Path -path "$BuildFolder\bin\Release") {
-                Remove-Item -path "$BuildFolder\bin\Release" -Recurse -Force
+            if (Test-Path  (Join-Path $BuildFolder "\bin\Release")) {
+                Remove-Item (Join-Path $BuildFolder "\bin\Release") -Recurse -Force
             }
             #Build Server
+			
+	
             Set-Location 'C:\Program Files\CMake\bin'
             Write-Progress -Activity "Building Server" -Status "Compiling Source"
             Write-Information -MessageData "Compiling and building will take some time. Go have a beer!" -InformationAction Continue
-            $BuildArgs = "-G `"Visual Studio 16 2019`" -A x64 -DTOOLS=1 -S $BaseLocation -B $BuildFolder"
+            $BuildArgs = "-G ""Visual Studio 16 2019"" -A x64 -DTOOLS=1 -S $BaseLocation -B $BuildFolder"
             Start-Process -FilePath 'C:\Program Files\CMake\bin\cmake.exe' -ArgumentList $BuildArgs -Wait
             Write-Progress -Activity "Building Server" -Status "Final Build"
             $FinalArgs = "--build $BuildFolder --config Release"
             Start-Process -FilePath "C:\Program Files\CMake\bin\cmake.exe" -ArgumentList $FinalArgs -Wait
             Write-Progress -Activity "Building Server" -Status "Ready" -Completed
             # Check to ensure build finished
-            if ((Test-Path -Path "$BuildFolder\bin\Release\authserver.exe") -and (Test-Path -Path "$BuildFolder\bin\Release\worldserver.exe")) {
+            if ((Test-Path (Join-Path $BuildFolder "\bin\Release\authserver.exe")) -and (Test-Path (Join-Path $BuildFolder "\bin\Release\worldserver.exe"))) {
                 Write-Information -MessageData "Compile and build Successful! Continuing..." -InformationAction Continue
             } else {
                 Write-Information -MessageData "Compile and build failed.  Check cmake logs and try again." -InformationAction Continue
@@ -585,55 +592,56 @@ do {
             }
 
             # Copy all conf.dist files to .conf
-            $DistFiles = Get-ChildItem -Path "$BuildFolder\bin\Release\configs" -Filter "*.dist"
+            $DistFiles = Get-ChildItem (Join-Path $BuildFolder "bin\Release\configs") -Filter "*.dist"
             foreach ($Dist in $DistFiles) {
                 $Conf = $Dist -replace ".{5}$"
-                Copy-Item -Path "$BuildFolder\bin\Release\configs\$Dist" -Destination "$BuildFolder\bin\Release\configs\$Conf"
+                Copy-Item (Join-Path $BuildFolder "\bin\Release\configs\$Dist") -Destination (Join-Path $BuildFolder "\bin\Release\configs\$Conf")
             }
-
             # Copy all conf.dist files from mods to .conf if modules are found
-            if (Test-Path -path "$BuildFolder\bin\Release\configs\modules") {
-                $ModDistFiles = Get-ChildItem -Path "$BuildFolder\bin\Release\configs\modules" -Filter "*.dist"
+            if (Test-Path -path (Join-Path $BuildFolder "\bin\Release\configs\modules")) {
+                $ModDistFiles = Get-ChildItem -Path (Join-Path $BuildFolder "\bin\Release\configs\modules") -Filter "*.dist"
                 foreach ($moddist in $ModDistFiles) {
                     $Conf = $moddist -replace ".{5}$"
-                    Copy-Item -Path "$BuildFolder\bin\Release\configs\modules\$moddist" -Destination "$BuildFolder\bin\Release\configs\modules\$Conf"
+                    Copy-Item -Path (Join-Path $BuildFolder "\bin\Release\configs\modules\$moddist") -Destination (Join-Path $BuildFolder "\bin\Release\configs\modules\$Conf")
                 }
             }
 
+
             # Change .conf file settings
-            New-Item -Path "$BuildFolder\bin\Release\Data" -ItemType Directory
-            New-Item -Path "$BuildFolder\bin\Release\Logs" -ItemType Directory
+            New-Item (Join-Path $BuildFolder "\bin\Release\Data") -ItemType Directory
+            New-Item (Join-Path $BuildFolder "\bin\Release\Logs") -ItemType Directory
             #World Config
-            $WorldServerConf = Get-Content -Path "$BuildFolder\bin\Release\configs\worldserver.conf"
+            $WorldServerConf = Get-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
             $NewWorldDataDir = $WorldServerConf -replace "DataDir = `".`"", "DataDir = `"Data`""
-            $NewWorldDataDir | Set-Content -Path "$BuildFolder\bin\Release\configs\worldserver.conf"
+            $NewWorldDataDir | Set-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
 
-            $WorldServerConf = Get-Content -Path "$BuildFolder\bin\Release\configs\worldserver.conf"
+            $WorldServerConf = Get-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
             $NewWorldLogDir = $WorldServerConf -replace "LogsDir = `".`"", "LogsDir = `"Logs`""
-            $NewWorldLogDir | Set-Content -Path "$BuildFolder\bin\Release\configs\worldserver.conf"
+            $NewWorldLogDir | Set-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
 
-            $WorldServerConf = Get-Content -Path "$BuildFolder\bin\Release\configs\worldserver.conf"
+            $WorldServerConf = Get-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
             $NewWorldSQLExe = $WorldServerConf -replace "MySQLExecutable = `"`"", "MySQLExecutable = `".\database\bin\mysql.exe`""
-            $NewWorldSQLExe | Set-Content -Path "$BuildFolder\bin\Release\configs\worldserver.conf"
+            $NewWorldSQLExe | Set-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
 
             #Auth Config
-            $AuthServerConf = Get-Content -Path "$BuildFolder\bin\Release\configs\authserver.conf"
+            $AuthServerConf = Get-Content (Join-Path $BuildFolder "\bin\Release\configs\authserver.conf")
             $NewAuthLogDir = $AuthServerConf -replace "LogsDir = `"`"", "LogsDir = `"Logs`""
-            $NewAuthLogDir | Set-Content -Path "$BuildFolder\bin\Release\configs\authserver.conf"
+            $NewAuthLogDir | Set-Content (Join-Path $BuildFolder "\bin\Release\configs\authserver.conf")
 
-            $AuthServerConf = Get-Content -Path "$BuildFolder\bin\Release\configs\authserver.conf"
+            $AuthServerConf = Get-Content (Join-Path $BuildFolder "\bin\Release\configs\authserver.conf")
             $NewAuthSQLExe = $AuthServerConf -replace "MySQLExecutable = `"`"", "MySQLExecutable = `".\database\bin\mysql.exe`""
             #$NewAuthSQLExe = $AuthServerConf -replace "MySQLExecutable = `"`"", "MySQLExecutable = `"$BuildFolder\bin\Release\database\bin\mysql.exe`""
-            $NewAuthSQLExe | Set-Content -Path "$BuildFolder\bin\Release\configs\authserver.conf"
+            $NewAuthSQLExe | Set-Content (Join-Path $BuildFolder "\bin\Release\configs\authserver.conf")
 
             #Maps Data
-            $AZCoreDataZipName = $AZCoreDataURL.Split("/")[-1]
-            $AZCoreDataZip = "$DownloadFolder\$AZCoreDataZipName"
+            
+
             if ($Downloaddata -eq "Yes") {
                 Write-Information -MessageData "Download is >1Gb so it will take some time.  Go have another beer!" -InformationAction Continue
                 if (!(Test-Path -path $AZCoreDataZip)) {
                     Try {
-                        Invoke-WebRequest -Uri $AZCoreDataURL -OutFile $AZCoreDataZip
+						Start-BitsTransfer -Source $AZCoreDataURL -Destination $AZCoreDataZip
+                  
                     } Catch {
                         $fail = $_.Exception.Response.StatusCode.Value__
                         Write-Information -Message "Failed to download $AZCoreDataZipName with error message: $fail" -InformationAction Continue
@@ -643,9 +651,10 @@ do {
                     Write-Information -MessageData "$AZCoreDataZipName was previously downloaded. Delete file and rerun if you need a new version downloaded" -InformationAction Continue
                 }
                 Write-Information -MessageData "Extracting files should take long enough for you to have another beer. Enjoy!" -InformationAction Continue
-                $datapaths = "$BuildFolder\bin\Release\Data"
+                $datapaths = Join-Path $BuildFolder "\bin\Release\Data"
                 if ((!(Test-Path -path "$datapaths\Cameras")) -or (!(Test-Path -path "$datapaths\dbc")) -or (!(Test-Path -path "$datapaths\maps")) -or (!(Test-Path -path "$datapaths\mmaps")) -or (!(Test-Path -path "$datapaths\vmaps"))) {
-                    Expand-Archive -Path $AZCoreDataZip -DestinationPath "$BuildFolder\bin\Release\Data"
+                 Add-Type -assembly “system.io.compression.filesystem”
+           		[System.IO.Compression.ZipFile]::ExtractToDirectory(($AZCoreDataZip), (Join-Path $BuildFolder "\bin\Release\Data\"))
                 } else {
                     Write-Information -MessageData "Skipping. Maps data previously extracted."
                 }
@@ -655,7 +664,7 @@ do {
             }
 
             #Copy SQL and Build Database. SQL is copied to ensure nothing is deleted or altered from main MySQL install in case program is also used for something else
-            New-Item -Path "$BuildFolder\bin\Release\database\bin" -ItemType Directory
+            New-Item (Join-Path $BuildFolder "\bin\Release\database\bin") -ItemType Directory
             $SQLBinFilesToCopy = @(
                 "C:\MySQL\lib\libmysql.dll"
                 "C:\MySQL\lib\libmysqld.dll"
@@ -667,15 +676,15 @@ do {
                 "C:\MySQL\bin\mysqldump.exe"
             )
             foreach ($SQLBinFile in $SQLBinFilesToCopy) {
-                Copy-Item -Path "$SQLBinFile" -Destination "$BuildFolder\bin\Release\database\bin"
+                Copy-Item -Path "$SQLBinFile" -Destination (Join-Path $BuildFolder "\bin\Release\database\bin")
             }
-            Copy-Item -Path "C:\MySQL\share" -Destination "$BuildFolder\bin\Release\database" -Recurse
-            Copy-Item -Path 'C:\MySQL\lib\libmysql.dll' -Destination "$BuildFolder\bin\Release\"
-            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libcrypto-1_1-x64.dll" -Destination "$BuildFolder\bin\Release\"
-            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libssl-1_1-x64.dll" -Destination "$BuildFolder\bin\Release\"
-            Copy-Item -Path 'C:\MySQL\lib\libmysql.dll' -Destination "$BuildFolder\bin\Release\configs\"
-            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libcrypto-1_1-x64.dll" -Destination "$BuildFolder\bin\Release\configs\"
-            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libssl-1_1-x64.dll" -Destination "$BuildFolder\bin\Release\configs\"
+            Copy-Item -Path "C:\MySQL\share" -Destination (Join-Path $BuildFolder "\bin\Release\database") -Recurse
+            Copy-Item -Path 'C:\MySQL\lib\libmysql.dll' -Destination (Join-Path $BuildFolder "\bin\Release\")
+            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libcrypto-1_1-x64.dll" -Destination (Join-Path $BuildFolder "\bin\Release\")
+            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libssl-1_1-x64.dll" -Destination (Join-Path $BuildFolder "\bin\Release\")
+            Copy-Item -Path 'C:\MySQL\lib\libmysql.dll' -Destination (Join-Path $BuildFolder "\bin\Release\configs\")
+            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libcrypto-1_1-x64.dll" -Destination (Join-Path $BuildFolder "\bin\Release\configs\")
+            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libssl-1_1-x64.dll" -Destination (Join-Path $BuildFolder "\bin\Release\configs\")
 
             # Initialize MySQL
             New-Item -Path "$BuildFolder\bin\Release\database\tmp" -ItemType Directory
@@ -684,7 +693,7 @@ do {
             Start-Process -FilePath "mysqld.exe" -ArgumentList "--initialize-insecure" -Wait
 
             # Create MySQLini
-            $MySQLINI = "$BuildFolder\bin\Release\database\my.ini"
+            $MySQLINI = Join-Path $BuildFolder "\bin\Release\database\my.ini"
                 New-Item -Path $MySQLINI -ItemType File -Force
                 Add-Content -Path $MySQLINI -Value "#Client Settings
                 [client]
@@ -729,7 +738,7 @@ do {
                     interactive-timeout"
 
             # Create MySQLConfigcnf
-            $MySQLConfigCNF = "$BuildFolder\bin\Release\database\config.cnf"
+            $MySQLConfigCNF = Join-Path $BuildFolder "\bin\Release\database\config.cnf"
             New-Item -Path $MySQLConfigCNF -ItemType File -Force
             Add-Content -Path $MySQLConfigCNF -Value "[client]
             user = root
@@ -738,7 +747,7 @@ do {
             port = 3306"
 
             # Create MySQLUpdatecnf
-            $MySQLUpdateCNF = "$BuildFolder\bin\Release\database\mysqlupdate.cnf"
+            $MySQLUpdateCNF = Join-Path $BuildFolder "\bin\Release\database\mysqlupdate.cnf"
             New-Item -Path $MySQLUpdateCNF -ItemType File -Force
             Add-Content -Path $MySQLUpdateCNF -Value "[client]
             user = root
@@ -747,12 +756,11 @@ do {
             port = 3306"
 
             # Create MySQL.bat
-            $MySQLbat = "$BuildFolder\bin\Release\1_start_mysql.bat"
+            $MySQLbat = Join-Path $BuildFolder "\bin\Release\1_start_mysql.bat"
             New-Item -Path $MySQLbat -ItemType File -Force
             Add-Content -Path $MySQLbat -Value "@echo off
             SET NAME=MyCustomServer - mysql-5.6.46-winx64
             TITLE %NAME%
-
             echo.
             echo.
             echo Starting MySQL. Press CTRL C for server shutdown
@@ -762,7 +770,7 @@ do {
             mysqld --defaults-file=..\my.ini --console --standalone"
 
             # Start MySQL Server
-            Set-Location "$BuildFolder\bin\Release"
+            Set-Location (Join-Path $BuildFolder "\bin\Release")
             Start-Process -FilePath "1_start_mysql.bat"
 
             # Set MySQL Root PW
@@ -960,4 +968,3 @@ do {
     
     }
 } until ($Selection -eq "q")
-
