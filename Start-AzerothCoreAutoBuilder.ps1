@@ -499,10 +499,16 @@ do {
             $checklist.MultiColumn = $true
 
             # Get Available Modules
-            $uri = New-Object System.UriBuilder -ArgumentList 'https://api.github.com/search/repositories?q=topic%3Acore-module+fork%3Atrue+org%3Aazerothcore&type=Repositories&per_page=100'
-            $baseuri = $uri.uri
-            $acmods = Invoke-RestMethod -Method Get -Uri $baseuri
-            $acmodslist = $acmods.items | Select-Object -Property name, clone_url | Sort-Object Name
+            $uri = New-Object System.UriBuilder -ArgumentList 'https://api.github.com/orgs/azerothcore/repos?q=mod&sort=name&per_page=100&page=1'
+                $baseuri = $uri.uri
+                $acmods = Invoke-RestMethod -Method Get -Uri $baseuri
+                $acmodslist1 = $acmods | Select-Object -Property name, clone_url | Sort-Object Name
+            $uri = New-Object System.UriBuilder -ArgumentList 'https://api.github.com/orgs/azerothcore/repos?q=mod&sort=name&per_page=100&page=2'
+                $baseuri = $uri.uri
+                $acmods = Invoke-RestMethod -Method Get -Uri $baseuri
+                $acmodslist2 = $acmods | Select-Object -Property name, clone_url | Sort-Object Name
+
+            $acmodslist = $acmodslist1+$acmodslist2
 
             # Add modules to checkboxlist with any already present defaulted to checked
             $CurrentModules = Get-ChildItem -Path "$BaseLocation\Modules" -Filter "mod*" | Select-Object -Property Name
