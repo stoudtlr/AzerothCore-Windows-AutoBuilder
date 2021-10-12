@@ -43,6 +43,27 @@ Function Show-Menu {
     Write-Host "Q: Quit"
 }
 
+Function Import-SQLscripts {
+    param (
+        [Parameter(Mandatory = $true,Position = 0)]
+        [string]$SQLDatabase,
+        [Parameter(Mandatory = $true,Position = 1)]
+        [string]$SQLScriptsPath
+    )
+
+    $SQLscripts = Get-ChildItem -Path $SQLScriptsPath -Filter "*.sql"
+    foreach ($SQLscript in $SQLscripts) {
+        $SQLscriptpath = $SQLScriptsPath + "\" + $SQLscript
+        Write-Progress -Activity "Importing SQL Files for $SQLDatabase" -Status "$SQLscript"
+        Try {
+            Get-Content $SQLscriptpath | &".\mysql.exe" --defaults-file=..\config.cnf $SQLDatabase 
+        } catch {
+            Write-Information -MessageData "$SQLscriptpath failed to import" -InformationAction Continue
+        }
+    }
+    Write-Progress -Activity "Importing SQL Files" -Status "Ready" -Completed
+}
+
 do {
     Show-Menu
     $Selection = Read-Host "`nEnter choice #"
@@ -53,26 +74,26 @@ do {
                 New-Item -path $DownloadFolder -ItemType Directory -Force
             }
             $GitURL = "https://api.github.com/repos/git-for-windows/git/releases/latest"
-            $GitInstallFile = "$DownloadFolder\$($GitVersion.name)"
+            $GitInstallFile = (Join-Path $DownloadFolder $($GitVersion.name))
             $CmakeVersion = "https://github.com/Kitware/CMake/releases/download/v3.16.4/cmake-3.16.4-win64-x64.msi"
             $CmakeFileName = $CmakeVersion.Split("/")[-1]
-            $CmakeInstallFile = "$DownloadFolder\$CmakeFileName"
+            $CmakeInstallFile = (Join-Path $DownloadFolder $CmakeFileName)
             $VisualStudioURL = "https://visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=Community&rel=16#"
             $VSFileName = "vs_community.exe"
-            $VSInstallFile = "$DownloadFolder\$VSFileName"
+            $VSInstallFile = (Join-Path $DownloadFolder $VSFileName)
             $OpenSSLURL = "http://slproweb.com/download/Win64OpenSSL-1_1_1L.exe"
             $OpenSSLFileName = $OpenSSLURL.Split("/")[-1]
-            $OpenSSLInstallFile = "$DownloadFolder\$OpenSSLFileName"
+            $OpenSSLInstallFile = (Join-Path $DownloadFolder $OpenSSLFileName)
             $MySQLURL = "https://dev.mysql.com/get/Downloads/MySQL-5.7/mysql-5.7.29-winx64.zip"
             $MySQLFileName = $MySQLURL.Split("/")[-1]
-            $MySQLZipFile = "$DownloadFolder\$MySQLFileName"
+            $MySQLZipFile = (Join-Path $DownloadFolder $MySQLFileName)
             $HeidiURL = "https://www.heidisql.com/downloads/releases/HeidiSQL_10.3_64_Portable.zip"
             $HeidiFileName = $HeidiURL.Split("/")[-1]
-            $HeidiZipFile = "$DownloadFolder\$HeidiFileName"
+            $HeidiZipFile = (Join-Path $DownloadFolder $HeidiFileName)
             #$BoostURL = "https://boostorg.jfrog.io/native/main/release/1.74.0/binaries/boost_1_74_0-msvc-14.2-64.exe"
             $BoostURL = "https://sourceforge.net/projects/boost/files/boost-binaries/1.74.0/boost_1_74_0-msvc-14.2-64.exe/download"
             $BoostFileName = $BoostURL.Split("/")[-2]
-            $BoostInstallFile = "$DownloadFolder\$BoostFileName"
+            $BoostInstallFile = (Join-Path $DownloadFolder $BoostFileName)
 
             # Pre-requisite checks section
             Write-Information -MessageData "Beginning pre-requisite checks and`ninstalling any missing but required software`n`n" -InformationAction Continue
@@ -86,7 +107,9 @@ do {
                     Write-Information -Message "Failed to download $HeidiFileName with error message: $fail" -InformationAction Continue
                     Break
                 }
-                Expand-Archive -Path $HeidiZipFile -DestinationPath "$DownloadFolder\HeidiSQL"
+            }
+            if (!(Test-Path -path (Join-Path $DownloadFolder "HeidiSQL\heidisql.exe"))) {
+                Expand-Archive -Path $HeidiZipFile -DestinationPath (Join-Path $DownloadFolder "HeidiSQL")
                 Start-Sleep -Seconds 2
             }
             # check for Git 64bit install
@@ -103,7 +126,7 @@ do {
                 }
                 Write-Information -MessageData "Download finished. Now installing" -InformationAction Continue
                 # create .inf file for git silent install
-                $GitINF = "$DownloadFolder\gitinstall.inf"
+                $GitINF = (Join-Path $DownloadFolder "gitinstall.inf")
                 New-Item -Path $GitINF -ItemType File -Force
                 Add-Content -Path $GitINF -Value "[Setup]
                     Lang=default
@@ -279,17 +302,12 @@ do {
                 Write-Information -MessageData "Bootstrap already ran" -InformationAction Continue
             }
             
-            # set Boost environment variable
-            $EnvName = "BOOST_ROOT"
-            $EnvValue = "C:/local/boost_1_74_0"
-            [System.Environment]::SetEnvironmentVariable($EnvName, $EnvValue, [System.EnvironmentVariableTarget]::Machine)
-
             # Program installation finished.  Restart now if required.
             if ($RestartRequired) {
                 Write-Information -MessageData "`n`n`nOne or more applications have been installed`nand PATH variables modified`nyou MUST close and reopen Powershell to continue`nrerun script to continue`n`n`n" -InformationAction Continue
                 Break
             } else {
-               Clear-Host
+                #Clear-Host
                 Write-Information -MessageData "All prerequisite software already installed and configured." -InformationAction Continue
             }
         }
@@ -318,11 +336,11 @@ do {
                 Write-Information -MessageData "Clone successfull!" -InformationAction Continue
             } else {
                 Write-Information -MessageData "AzerothCore already exists`nWill clean and update repo now" -InformationAction Continue
-                if (Test-Path (Join-Path $BaseLocation "\modules")) {
-                    Remove-Item (Join-Path $BaseLocation "\modules") -Recurse -Force
+                if (Test-Path (Join-Path $BaseLocation "modules")) {
+                    Remove-Item (Join-Path $BaseLocation "modules") -Recurse -Force
                 }
-                if (Test-Path 	(Join-Path $BaseLocation "\data\sql\updates")) {
-                    Remove-Item (Join-Path $BaseLocation "\data\sql\updates") -Recurse -Force
+                if (Test-Path 	(Join-Path $BaseLocation "data\sql\updates")) {
+                    Remove-Item (Join-Path $BaseLocation "data\sql\updates") -Recurse -Force
                 }
                 Set-Location $BaseLocation
                 
@@ -374,7 +392,6 @@ do {
                 }
 
             }
-            Clear-Host
             Write-Information -MessageData "AzerothCore cloned and/or cleaned.  You may now build server or download PR to test" -InformationAction Continue
         }
         #Download PR to Test
@@ -419,7 +436,7 @@ do {
                 } Catch {
                     throw
                 }
-                Clear-Host
+                #Clear-Host
                 Write-Information -MessageData "PR# $PR has been pulled.  You may now build server" -InformationAction Continue
             }
         }
@@ -511,7 +528,7 @@ do {
             $acmodslist = $acmodslist1+$acmodslist2
 
             # Add modules to checkboxlist with any already present defaulted to checked
-            $CurrentModules = Get-ChildItem -Path "$BaseLocation\Modules" -Filter "mod*" | Select-Object -Property Name
+            $CurrentModules = Get-ChildItem -Path (Join-Path $BaseLocation "Modules") -Filter "mod*" | Select-Object -Property Name
             $modnumber = 0
             foreach ($acmod in $acmodslist) {
                 if ($acmod.name -like "mod*") {
@@ -532,17 +549,35 @@ do {
             $OKButton.Add_Click({
                 $Script:Cancel=$false
                 $Form.Hide()
+                $CurrentModules = Get-ChildItem -Path (Join-Path $BaseLocation "Modules") -Filter "mod*" | Select-Object -Property Name
+                $Searchlist = $CurrentModules.name
+                $CheckedItems = $checklist.checkeditems
+                foreach ($item in $Searchlist) {
+                    $itemname = $item.remove(0,4)
+                    if ($CheckedItems -notcontains $itemname) {
+                        Write-Information -MessageData "$item no longer checked. removing" -InformationAction Continue
+                        Remove-Item (Join-Path $BaseLocation "Modules\$item") -Recurse -Force
+                    }
+                }
                 foreach ($mod in $checklist.CheckedItems) {
                     foreach ($acmod in $acmodslist) {
                         if ($acmod.name -like "*$mod") {
-                            $modpath = "$BaseLocation\modules\" + $acmod.name
+                            $modpath = (Join-Path $BaseLocation "modules\") + $acmod.name
                             Write-Progress -Activity "Downloading Modules" -Status $acmod.name
                             Get-AZModule -AZmodPath $modpath -AZmodURL $acmod.clone_url
                         }
                     }
                     if ($mod -eq "eluna-lua-engine") {
                         Write-Progress -Activity "Downloading Modules" -Status "Installing LUA Engine"
-                        Get-AZModule -AZmodPath "$BaseLocation\modules\mod-eluna-lua-engine\LuaEngine" -AZmodURL "https://github.com/ElunaLuaEngine/Eluna.git"
+                        try {
+                            Set-Location (Join-Path $BaseLocation "modules\mod-eluna-lua-engine")
+                            git submodule update --init
+                            if (-not $?) {
+                                throw "git error! failed to update $AZmodname"
+                            }
+                        } Catch {
+                            throw
+                        }
                     }
                 }
                 Write-Progress -Activity "Downloading Modules" -Status "Ready" -Completed
@@ -564,10 +599,36 @@ do {
 
         #Build Server and database
         '5' {
-            #Deletes old files, to include databases, to ensure clean build
-            if (Test-Path  (Join-Path $BuildFolder "\bin\Release")) {
-                Get-ChildItem -path (Join-Path $BuildFolder "\bin\Release") -Recurse -Exclude *.m2, *.dbc, *.map, *.mmap, *.mmtile, *.vmtree, *.vmtile, *.vmo | Where-Object {!($_.PSIsContainer)} | Remove-Item -Force
-                Get-ChildItem -path (Join-Path $BuildFolder "\bin\Release") -Exclude "Data" | Remove-Item -Recurse -Force
+            Function Show-BuildMenu {
+                Write-Host "`n`nChoose your build option`n"
+                Write-Host "1: Build (Data folder containing maps, vmaps, etc is saved)"
+                Write-Host "2: Nuke and Build (Deletes and recreates ALL to include Cmake and Project files)"
+                Write-Host "Q: Back"
+            }
+            do {
+                Show-BuildMenu
+                $BuildSelection = Read-Host "`nEnter choice #"
+                switch ($BuildSelection) {
+                    '1' {
+                        if (Test-Path (Join-Path $BuildFolder "bin\Release")) {
+                            Get-ChildItem -path (Join-Path $BuildFolder "bin\Release") -Exclude "Data" | Remove-Item -Recurse -Force
+                            Write-Information -MessageData "Files deleted. Continuing with the build"
+                            break
+                        }
+                    }
+                    '2' {
+                        if (Test-Path $BuildFolder) {
+                            Get-ChildItem -path $BuildFolder | Remove-Item -Recurse -Force
+                            Get-ChildItem -path $BuildFolder -hidden | Remove-Item -Recurse -Force
+                            Write-Information -MessageData "Files deleted. Continuing with the build"
+                            break
+                        }
+                    }
+                }
+            } until (($BuildSelection -eq "1") -or ($BuildSelection -eq "2") -or ($BuildSelection -eq "q"))
+
+            if ($BuildSelection -eq "q") {
+                break
             }
 
             #Build Server
@@ -581,7 +642,7 @@ do {
             Start-Process -FilePath "C:\Program Files\CMake\bin\cmake.exe" -ArgumentList $FinalArgs -Wait
             Write-Progress -Activity "Building Server" -Status "Ready" -Completed
             # Check to ensure build finished
-            if ((Test-Path (Join-Path $BuildFolder "\bin\Release\authserver.exe")) -and (Test-Path (Join-Path $BuildFolder "\bin\Release\worldserver.exe"))) {
+            if ((Test-Path (Join-Path $BuildFolder "bin\Release\authserver.exe")) -and (Test-Path (Join-Path $BuildFolder "bin\Release\worldserver.exe"))) {
                 Write-Information -MessageData "Compile and build Successful! Continuing..." -InformationAction Continue
             } else {
                 Write-Information -MessageData "Compile and build failed.  Check cmake logs and try again." -InformationAction Continue
@@ -592,51 +653,51 @@ do {
             $DistFiles = Get-ChildItem (Join-Path $BuildFolder "bin\Release\configs") -Filter "*.dist"
             foreach ($Dist in $DistFiles) {
                 $Conf = $Dist -replace ".{5}$"
-                Copy-Item (Join-Path $BuildFolder "\bin\Release\configs\$Dist") -Destination (Join-Path $BuildFolder "\bin\Release\configs\$Conf")
+                Copy-Item (Join-Path $BuildFolder "bin\Release\configs\$Dist") -Destination (Join-Path $BuildFolder "bin\Release\configs\$Conf")
             }
             # Copy all conf.dist files from mods to .conf if modules are found
-            if (Test-Path -path (Join-Path $BuildFolder "\bin\Release\configs\modules")) {
-                $ModDistFiles = Get-ChildItem -Path (Join-Path $BuildFolder "\bin\Release\configs\modules") -Filter "*.dist"
+            if (Test-Path -path (Join-Path $BuildFolder "bin\Release\configs\modules")) {
+                $ModDistFiles = Get-ChildItem -Path (Join-Path $BuildFolder "bin\Release\configs\modules") -Filter "*.dist"
                 foreach ($moddist in $ModDistFiles) {
                     $Conf = $moddist -replace ".{5}$"
-                    Copy-Item -Path (Join-Path $BuildFolder "\bin\Release\configs\modules\$moddist") -Destination (Join-Path $BuildFolder "\bin\Release\configs\modules\$Conf")
+                    Copy-Item -Path (Join-Path $BuildFolder "bin\Release\configs\modules\$moddist") -Destination (Join-Path $BuildFolder "bin\Release\configs\modules\$Conf")
                 }
             }
 
             # Change .conf file settings
-            New-Item (Join-Path $BuildFolder "\bin\Release\Data") -ItemType Directory -ErrorAction SilentlyContinue
-            New-Item (Join-Path $BuildFolder "\bin\Release\Logs") -ItemType Directory -ErrorAction SilentlyContinue
+            New-Item (Join-Path $BuildFolder "bin\Release\Data") -ItemType Directory -ErrorAction SilentlyContinue
+            New-Item (Join-Path $BuildFolder "bin\Release\Logs") -ItemType Directory -ErrorAction SilentlyContinue
             #World Config
-            $WorldServerConf = Get-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
+            $WorldServerConf = Get-Content (Join-Path $BuildFolder "bin\Release\configs\worldserver.conf")
             $NewWorldDataDir = $WorldServerConf -replace "DataDir = `".`"", "DataDir = `"Data`""
-            $NewWorldDataDir | Set-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
+            $NewWorldDataDir | Set-Content (Join-Path $BuildFolder "bin\Release\configs\worldserver.conf")
 
-            $WorldServerConf = Get-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
+            $WorldServerConf = Get-Content (Join-Path $BuildFolder "bin\Release\configs\worldserver.conf")
             $NewWorldLogDir = $WorldServerConf -replace "LogsDir = `".`"", "LogsDir = `"Logs`""
-            $NewWorldLogDir | Set-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
+            $NewWorldLogDir | Set-Content (Join-Path $BuildFolder "bin\Release\configs\worldserver.conf")
 
-            $WorldServerConf = Get-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
+            $WorldServerConf = Get-Content (Join-Path $BuildFolder "bin\Release\configs\worldserver.conf")
             $NewWorldSQLExe = $WorldServerConf -replace "MySQLExecutable = `"`"", "MySQLExecutable = `".\database\bin\mysql.exe`""
-            $NewWorldSQLExe | Set-Content (Join-Path $BuildFolder "\bin\Release\configs\worldserver.conf")
+            $NewWorldSQLExe | Set-Content (Join-Path $BuildFolder "bin\Release\configs\worldserver.conf")
 
             #Auth Config
-            $AuthServerConf = Get-Content (Join-Path $BuildFolder "\bin\Release\configs\authserver.conf")
+            $AuthServerConf = Get-Content (Join-Path $BuildFolder "bin\Release\configs\authserver.conf")
             $NewAuthLogDir = $AuthServerConf -replace "LogsDir = `"`"", "LogsDir = `"Logs`""
-            $NewAuthLogDir | Set-Content (Join-Path $BuildFolder "\bin\Release\configs\authserver.conf")
+            $NewAuthLogDir | Set-Content (Join-Path $BuildFolder "bin\Release\configs\authserver.conf")
 
-            $AuthServerConf = Get-Content (Join-Path $BuildFolder "\bin\Release\configs\authserver.conf")
+            $AuthServerConf = Get-Content (Join-Path $BuildFolder "bin\Release\configs\authserver.conf")
             $NewAuthSQLExe = $AuthServerConf -replace "MySQLExecutable = `"`"", "MySQLExecutable = `".\database\bin\mysql.exe`""
-            $NewAuthSQLExe | Set-Content (Join-Path $BuildFolder "\bin\Release\configs\authserver.conf")
+            $NewAuthSQLExe | Set-Content (Join-Path $BuildFolder "bin\Release\configs\authserver.conf")
 
             #Maps Data
             if ($Downloaddata -eq "Yes") {
                 $AZCoreDataZipName = $AZCoreDataURL.Split("/")[-1]
                 $AZCoreDataZip = Join-Path $DownloadFolder "$AZCoreDataZipName"
-                Write-Information -MessageData "Download is >1Gb so it will take some time.  Go have another beer!" -InformationAction Continue
                 if (!(Test-Path -path $AZCoreDataZip)) {
                     if (!(Test-Path -path $DownloadFolder)) {
                         New-Item -path $DownloadFolder -ItemType Directory -Force
                     }
+                    Write-Information -MessageData "Download is >1Gb so it will take some time.  Go have another beer!" -InformationAction Continue
                     Try {
 						Start-BitsTransfer -Source $AZCoreDataURL -Destination $AZCoreDataZip
                   
@@ -648,10 +709,10 @@ do {
                 } else {
                     Write-Information -MessageData "$AZCoreDataZipName was previously downloaded. Delete file and rerun if you need a new version downloaded" -InformationAction Continue
                 }
-                $datapaths = Join-Path $BuildFolder "\bin\Release\Data"
+                $datapaths = Join-Path $BuildFolder "bin\Release\Data"
                 if ((!(Test-Path -path "$datapaths\Cameras")) -or (!(Test-Path -path "$datapaths\dbc")) -or (!(Test-Path -path "$datapaths\maps")) -or (!(Test-Path -path "$datapaths\mmaps")) -or (!(Test-Path -path "$datapaths\vmaps"))) {
                     Write-Information -MessageData "Extracting files should take long enough for you to have another beer. Enjoy!" -InformationAction Continue
-                    Expand-Archive -Path $AZCoreDataZip -DestinationPath "$BuildFolder\bin\Release\Data"
+                    Expand-Archive -Path $AZCoreDataZip -DestinationPath $datapaths
                 } else {
                     Write-Information -MessageData "Skipping. Maps data previously extracted."
                 }
@@ -659,9 +720,25 @@ do {
                 Write-Information -MessageData "`n`n!!Don't forget to manually copy data files!!`n`n" -InformationAction Continue
                 Start-Sleep -Seconds 3
             }
+            
+            # Create MySQL.bat
+                $MySQLbat = Join-Path $BuildFolder "bin\Release\1_start_mysql.bat"
+                New-Item -Path $MySQLbat -ItemType File -Force
+                Add-Content -Path $MySQLbat -Value "@echo off
+                SET NAME=MyCustomServer - mysql-5.6.46-winx64
+                TITLE %NAME%
+                echo.
+                echo.
+                echo Starting MySQL. Press CTRL C for server shutdown
+                echo.
+                echo.
+                cd .\database\bin
+                mysqld --defaults-file=..\my.ini --console --standalone"
+            $MySQLConfigCNF = Join-Path $BuildFolder "bin\Release\database\config.cnf"
+            $SQLPath = Join-Path $BuildFolder "bin\Release\database\bin\mysql.exe"
 
             #Copy SQL and Build Database. SQL is copied to ensure nothing is deleted or altered from main MySQL install in case program is also used for something else
-            New-Item (Join-Path $BuildFolder "\bin\Release\database\bin") -ItemType Directory -ErrorAction SilentlyContinue
+            New-Item (Join-Path $BuildFolder "bin\Release\database\bin") -ItemType Directory -ErrorAction SilentlyContinue
             $SQLBinFilesToCopy = @(
                 "C:\MySQL\lib\libmysql.dll"
                 "C:\MySQL\lib\libmysqld.dll"
@@ -673,24 +750,24 @@ do {
                 "C:\MySQL\bin\mysqldump.exe"
             )
             foreach ($SQLBinFile in $SQLBinFilesToCopy) {
-                Copy-Item -Path "$SQLBinFile" -Destination (Join-Path $BuildFolder "\bin\Release\database\bin")
+                Copy-Item -Path "$SQLBinFile" -Destination (Join-Path $BuildFolder "bin\Release\database\bin")
             }
-            Copy-Item -Path "C:\MySQL\share" -Destination (Join-Path $BuildFolder "\bin\Release\database") -Recurse -ErrorAction SilentlyContinue
-            Copy-Item -Path 'C:\MySQL\lib\libmysql.dll' -Destination (Join-Path $BuildFolder "\bin\Release\")
-            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libcrypto-1_1-x64.dll" -Destination (Join-Path $BuildFolder "\bin\Release\")
-            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libssl-1_1-x64.dll" -Destination (Join-Path $BuildFolder "\bin\Release\")
-            Copy-Item -Path 'C:\MySQL\lib\libmysql.dll' -Destination (Join-Path $BuildFolder "\bin\Release\configs\")
-            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libcrypto-1_1-x64.dll" -Destination (Join-Path $BuildFolder "\bin\Release\configs\")
-            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libssl-1_1-x64.dll" -Destination (Join-Path $BuildFolder "\bin\Release\configs\")
+            Copy-Item -Path "C:\MySQL\share" -Destination (Join-Path $BuildFolder "bin\Release\database") -Recurse -ErrorAction SilentlyContinue
+            Copy-Item -Path 'C:\MySQL\lib\libmysql.dll' -Destination (Join-Path $BuildFolder "bin\Release\")
+            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libcrypto-1_1-x64.dll" -Destination (Join-Path $BuildFolder "bin\Release\")
+            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libssl-1_1-x64.dll" -Destination (Join-Path $BuildFolder "bin\Release\")
+            Copy-Item -Path 'C:\MySQL\lib\libmysql.dll' -Destination (Join-Path $BuildFolder "bin\Release\configs\")
+            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libcrypto-1_1-x64.dll" -Destination (Join-Path $BuildFolder "bin\Release\configs\")
+            Copy-Item -Path "C:\Program Files\OpenSSL-Win64\libssl-1_1-x64.dll" -Destination (Join-Path $BuildFolder "bin\Release\configs\")
 
             # Initialize MySQL
-            New-Item -Path "$BuildFolder\bin\Release\database\tmp" -ItemType Directory -ErrorAction SilentlyContinue
-            New-Item -Path "$BuildFolder\bin\Release\database\data" -ItemType Directory -ErrorAction SilentlyContinue
-            Set-Location "$BuildFolder\bin\Release\database\bin"
+            New-Item -Path (Join-Path $BuildFolder "bin\Release\database\tmp") -ItemType Directory -ErrorAction SilentlyContinue
+            New-Item -Path (Join-Path $BuildFolder "bin\Release\database\data") -ItemType Directory -ErrorAction SilentlyContinue
+            Set-Location (Join-Path $BuildFolder "bin\Release\database\bin")
             Start-Process -FilePath "mysqld.exe" -ArgumentList "--initialize-insecure" -Wait
 
             # Create MySQLini
-            $MySQLINI = Join-Path $BuildFolder "\bin\Release\database\my.ini"
+            $MySQLINI = Join-Path $BuildFolder "bin\Release\database\my.ini"
                 New-Item -Path $MySQLINI -ItemType File -Force
                 Add-Content -Path $MySQLINI -Value "#Client Settings
                 [client]
@@ -735,7 +812,6 @@ do {
                     interactive-timeout"
 
             # Create MySQLConfigcnf
-            $MySQLConfigCNF = Join-Path $BuildFolder "\bin\Release\database\config.cnf"
             New-Item -Path $MySQLConfigCNF -ItemType File -Force
             Add-Content -Path $MySQLConfigCNF -Value "[client]
             user = root
@@ -744,7 +820,7 @@ do {
             port = 3306"
 
             # Create MySQLUpdatecnf
-            $MySQLUpdateCNF = Join-Path $BuildFolder "\bin\Release\database\mysqlupdate.cnf"
+            $MySQLUpdateCNF = Join-Path $BuildFolder "bin\Release\database\mysqlupdate.cnf"
             New-Item -Path $MySQLUpdateCNF -ItemType File -Force
             Add-Content -Path $MySQLUpdateCNF -Value "[client]
             user = root
@@ -752,68 +828,34 @@ do {
             host = 127.0.0.1
             port = 3306"
 
-            # Create MySQL.bat
-            $MySQLbat = Join-Path $BuildFolder "\bin\Release\1_start_mysql.bat"
-            New-Item -Path $MySQLbat -ItemType File -Force
-            Add-Content -Path $MySQLbat -Value "@echo off
-            SET NAME=MyCustomServer - mysql-5.6.46-winx64
-            TITLE %NAME%
-            echo.
-            echo.
-            echo Starting MySQL. Press CTRL C for server shutdown
-            echo.
-            echo.
-            cd .\database\bin
-            mysqld --defaults-file=..\my.ini --console --standalone"
-
             # Start MySQL Server
-            Set-Location (Join-Path $BuildFolder "\bin\Release")
+            Set-Location (Join-Path $BuildFolder "bin\Release")
             Start-Process -FilePath "1_start_mysql.bat"
 
             # Set MySQL Root PW
             $sqlCMD = "ALTER USER 'root'@'localhost' IDENTIFIED BY '$SQLRootPassword';"
             $SQLChangePWArgs = "-uroot --execute=`"$sqlCMD`""
-            Start-Process -FilePath "$BuildFolder\bin\Release\database\bin\mysql.exe" -ArgumentList $SQLChangePWArgs -Wait -ErrorAction Stop
+            Start-Process -FilePath $SQLPath -ArgumentList $SQLChangePWArgs -Wait -ErrorAction Stop
             Write-Information -MessageData "Root password set to: $SQLRootPassword" -InformationAction Continue
 
             # Create databases
-            $CreateDBCMD = Get-Content -Path "$BaseLocation\data\sql\create\create_mysql.sql"
-            $CreateDBArgs = "--defaults-file=$BuildFolder\bin\Release\database\config.cnf --execute=`"$CreateDBCMD`""
-            Start-Process -FilePath "$BuildFolder\bin\Release\database\bin\mysql.exe" -ArgumentList $CreateDBArgs -Wait
+            $CreateDBCMD = Get-Content -Path (Join-Path $BaseLocation "data\sql\create\create_mysql.sql")
+            $CreateDBArgs = "--defaults-file=$MySQLConfigCNF --execute=`"$CreateDBCMD`""
+            Start-Process -FilePath $SQLPath -ArgumentList $CreateDBArgs -Wait
 
             # Configure the databases
-            Function Import-SQLscripts {
-                param (
-                    [Parameter(Mandatory = $true,Position = 0)]
-                    [string]$SQLDatabase,
-                    [Parameter(Mandatory = $true,Position = 1)]
-                    [string]$SQLScriptsPath
-                )
-
-                $SQLscripts = Get-ChildItem -Path $SQLScriptsPath -Filter "*.sql"
-                foreach ($SQLscript in $SQLscripts) {
-                    $SQLscriptpath = $SQLScriptsPath + "\" + $SQLscript
-                    Write-Progress -Activity "Importing SQL Files for $SQLDatabase" -Status "$SQLscript"
-                    Try {
-                        Get-Content $SQLscriptpath | &".\mysql.exe" --defaults-file=..\config.cnf $SQLDatabase 
-                    } catch {
-                        Write-Information -MessageData "$SQLscriptpath failed to import" -InformationAction Continue
-                    }
-                }
-                Write-Progress -Activity "Importing SQL Files" -Status "Ready" -Completed
-            }
-            Set-Location -Path "$BuildFolder\bin\Release\database\bin"
-            $authDBScriptsPath = "$BaseLocation\data\sql\base\db_auth"
-            $authDBupdateScriptsPath = "$BaseLocation\data\sql\updates\db_auth"
-            $authDBpendingupdateScriptsPath = "$BaseLocation\data\sql\updates\pending_db_auth"
+            Set-Location -Path (Join-Path $BuildFolder "bin\Release\database\bin")
+            $authDBScriptsPath = (Join-Path $BaseLocation "data\sql\base\db_auth")
+            $authDBupdateScriptsPath = (Join-Path $BaseLocation "data\sql\updates\db_auth")
+            $authDBpendingupdateScriptsPath = (Join-Path $BaseLocation "data\sql\updates\pending_db_auth")
             
-            $characterDBScriptsPath = "$BaseLocation\data\sql\base\db_characters"
-            $characterDBupdateScriptsPath = "$BaseLocation\data\sql\updates\db_characters"
-            $characterDBpendingupdateScriptsPath = "$BaseLocation\data\sql\updates\pending_db_characters"
+            $characterDBScriptsPath = (Join-Path $BaseLocation "data\sql\base\db_characters")
+            $characterDBupdateScriptsPath = (Join-Path $BaseLocation "data\sql\updates\db_characters")
+            $characterDBpendingupdateScriptsPath = (Join-Path $BaseLocation "data\sql\updates\pending_db_characters")
 
-            $worldDBScriptsPath = "$BaseLocation\data\sql\base\db_world"
-            $worldDBupdateScriptsPath = "$BaseLocation\data\sql\updates\db_world"
-            $worldDBpendingupdateScriptsPath = "$BaseLocation\data\sql\updates\pending_db_world"
+            $worldDBScriptsPath = (Join-Path $BaseLocation "data\sql\base\db_world")
+            $worldDBupdateScriptsPath = (Join-Path $BaseLocation "data\sql\updates\db_world")
+            $worldDBpendingupdateScriptsPath = (Join-Path $BaseLocation "data\sql\updates\pending_db_world")
 
             Import-SQLscripts -SQLDatabase "acore_auth" -SQLScriptsPath $authDBScriptsPath
             Import-SQLscripts -SQLDatabase "acore_auth" -SQLScriptsPath $authDBupdateScriptsPath
@@ -824,12 +866,12 @@ do {
             Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBScriptsPath
             Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBupdateScriptsPath
             Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBpendingupdateScriptsPath
-
+            
             # Import SQL scripts from modules
-            $InstalledModules = Get-ChildItem -Path "$BaseLocation\modules" -Filter "mod*"
+            $InstalledModules = Get-ChildItem -Path (Join-Path $BaseLocation "modules") -Filter "mod*"
             foreach ($InstalledModule in $InstalledModules) {
                 Write-Progress -Activity "Importing SQL files from installed modules" -Status "$InstalledModule"
-                $Modfiles = Get-ChildItem -Path "$BaseLocation\modules\$InstalledModule" -Recurse -Filter "*.sql"
+                $Modfiles = Get-ChildItem -Path (Join-Path $BaseLocation "modules\$InstalledModule") -Recurse -Filter "*.sql"
                 foreach ($Modfile in $Modfiles) {
                     $Modpath = $Modfile.FullName
                     $SQLDatabase = $false
@@ -869,10 +911,11 @@ do {
             }
 
             # Stop SQL server after database configuration
-            Start-Process -FilePath "$BuildFolder\bin\Release\database\bin\mysqladmin.exe" -ArgumentList "--user=root --password=$SQLRootPassword shutdown"
+            $SQLAdmin = Join-Path $BuildFolder "bin\Release\database\bin\mysqladmin.exe"
+            Start-Process -FilePath $SQLAdmin -ArgumentList "--user=root --password=$SQLRootPassword shutdown"
 
             # Create authserver.bat
-            $AuthServerbat = "$BuildFolder\bin\Release\2_start_authserver.bat"
+            $AuthServerbat = (Join-Path $BuildFolder "bin\Release\2_start_authserver.bat")
             New-Item -Path $AuthServerbat -ItemType File -Force
             Add-Content -Path $AuthServerbat -Value "@echo off
             echo.
@@ -884,7 +927,7 @@ do {
             start authserver.exe"
 
             # Create worldserver.bat
-            $WorldServerbat = "$BuildFolder\bin\Release\3_start_worldserver.bat"
+            $WorldServerbat = (Join-Path $BuildFolder "bin\Release\3_start_worldserver.bat")
             New-Item -Path $WorldServerbat -ItemType File -Force
             Add-Content -Path $WorldServerbat -Value "@echo off
             echo.
@@ -902,7 +945,7 @@ do {
         '6' {
             Write-Information -MessageData "Remember that this should only be used for testing PR's!`nDo not play a solo server or host from here`nThese files are automatically deleted on rebuild`nto ensure clean testing environment`nChoose '7' if you want a permanent personal server to play on" -InformationAction Continue
             Start-Sleep -Seconds 3
-            Set-Location -Path "$BuildFolder\bin\Release"
+            Set-Location -Path (Join-Path $BuildFolder "bin\Release")
             Start-Process -FilePath "1_start_mysql.bat"
             Start-Sleep -Seconds 3
             Start-Process -FilePath "2_start_authserver.bat"
@@ -915,52 +958,112 @@ do {
 
         #Create Repack
         '7' {
-            if (Test-Path -path "$PersonalServerFolder\Server\worldserver.exe") {
+            $NewRepack = $null
+            if (Test-Path -path (Join-Path $PersonalServerFolder "Server\worldserver.exe")) {
                 Write-Host "Existing Server Repack found at:`n$PersonalServerFolder`n`n"
                 Write-Host "What would you like to do?"
-                Write-Host "1. Delete existing files and continue building repack"
-                Write-Host "2. Exit"
+                Write-Host "1. Update repack (Data folder, Auth and Character databases, and configs saved)"
+                Write-Host "2. New repack (delete existing files and create new)"
+                Write-Host "Q. Back"
 
                 do {
                     $RepackChoice = read-host "`nEnter Choice #"
-                } until (($RepackChoice -eq "1") -or ($RepackChoice -eq "2"))
+                } until (($RepackChoice -eq "1") -or ($RepackChoice -eq "2") -or ($RepackChoice -eq "Q"))
 
+                if ($RepackChoice -eq "1") {
+                    Get-ChildItem -path (Join-Path $BuildFolder "bin\Release") -Exclude "Data", "database", "configs" | Copy-Item -Destination (Join-Path $PersonalServerFolder "Server") -Force
+                    # Start MySQL Server
+                    $SQLPath = Join-Path $PersonalServerFolder "Server\database\bin\mysql.exe"
+                    Set-Location (Join-Path $PersonalServerFolder "Server")
+                    Start-Process -FilePath "1_start_mysql.bat"
+
+                    # recreate world db
+                    $MySQLConfigCNF = Join-Path $PersonalServerFolder "Server\database\config.cnf"
+                    Set-Location (Join-Path $PersonalServerFolder "Server\database\bin")
+                    .\mysqldump.exe --defaults-file=$MySQLConfigCNF --add-drop-table --no-data acore_world > .\drop_all_tables.sql
+                    $DropTables = Join-Path $PersonalServerFolder "Server\database\bin\"
+                    Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $DropTables
+                    $DropWorld = "DROP DATABASE acore_world"
+                    $DropArgs = "--defaults-file=$MySQLConfigCNF --execute=`"$DropWorld`""
+                    Start-Process -FilePath $SQLPath -ArgumentList $DropArgs -Wait
+                    if (Test-Path -path (Join-Path $PersonalServerFolder "Server\database\data\acore_world")) {
+                        Remove-Item -path (Join-Path $PersonalServerFolder "Server\database\data\acore_world") -Recurse -Force
+                    }
+                    $CreateDBCMD = Get-Content -Path (Join-Path $BaseLocation "data\sql\create\create_mysql.sql") | Select -Index 5,11
+                    $CreateDBArgs = "--defaults-file=$MySQLConfigCNF --execute=`"$CreateDBCMD`""
+                    Start-Process -FilePath $SQLPath -ArgumentList $CreateDBArgs -Wait
+
+                    Set-Location -Path (Join-Path $PersonalServerFolder "Server\database\bin")
+                    $worldDBScriptsPath = (Join-Path $BaseLocation "data\sql\base\db_world")
+                    $worldDBupdateScriptsPath = (Join-Path $BaseLocation "data\sql\updates\db_world")
+                    $worldDBpendingupdateScriptsPath = (Join-Path $BaseLocation "data\sql\updates\pending_db_world")
+
+                    Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBScriptsPath
+                    Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBupdateScriptsPath
+                    Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBpendingupdateScriptsPath
+
+                    $SQLAdmin = Join-Path $PersonalServerFolder "Server\database\bin\mysqladmin.exe"
+                    Start-Process -FilePath $SQLAdmin -ArgumentList "--user=root --password=$SQLRootPassword shutdown"
+                }
                 if ($RepackChoice -eq "2") {
-                    Break
-                } else {
                     Write-Information -MessageData "Deleting existing files" -InformationAction Continue
                     Remove-Item -path $PersonalServerFolder -Recurse -Force
+                    $NewRepack = $true
                 }
+                if ($RepackChoice -eq "Q") {
+                    Break
+                }
+            } else {
+                $NewRepack = $true
             }
-            Write-Information -MessageData "Creating personal server at:`n$PersonalServerFolder" -InformationAction Continue
-            Try {
-                New-Item -Path $PersonalServerFolder -ItemType Directory
-            } Catch {
-                Write-Error -Message "Unable to create folder. Ensure valid path was used and retry" -ErrorAction Stop
-            }
-            Copy-Item -path "$BuildFolder\bin\Release" -Destination $PersonalServerFolder -Recurse
-            Rename-Item -Path "$PersonalServerFolder\Release" -NewName "Server"
-            New-Item -Path "$PersonalServerFolder\Tools" -ItemType Directory
-            Start-Sleep -Seconds 3
-            Write-Information -InformationAction "Copying HeidiSQL to repack folder" -InformationAction Continue
-            Try {
-                Copy-Item -Path "$DownloadFolder\HeidiSQL_10.3_64_Portable" -Destination "$PersonalServerFolder\Tools" -Recurse
-            } Catch {
-                Write-Information -MessageData "Failed to copy HeidiSQL.  Try to manually copy from:`n$DownloadFolder\HeidiSQL`n To folder:`n$PersonalServerFolder\Tools"
-            }
-            $StartServerbat = "$PersonalServerFolder\Start_WoW_Server.bat"
-            New-Item -Path $StartServerbat -ItemType File -Force
-            Add-Content -Path $StartServerbat -Value "@echo off
-            cd .\Server
-            start 1_start_mysql.bat
-            timeout /T 3
-            start 2_start_authserver.bat
-            timeout /T 3
-            3_start_worldserver.bat"
+            if ($NewRepack -eq $true) {
+                Write-Information -MessageData "Creating personal server at:`n$PersonalServerFolder" -InformationAction Continue
+                Try {
+                    New-Item -Path $PersonalServerFolder -ItemType Directory
+                } Catch {
+                    Write-Error -Message "Unable to create folder. Ensure valid path was used and retry" -ErrorAction Stop
+                }
+                Copy-Item -path (Join-Path $BuildFolder "bin\Release") -Destination $PersonalServerFolder -Recurse
+                Rename-Item -Path (Join-Path $PersonalServerFolder "Release") -NewName "Server"
+                New-Item -Path (Join-Path $PersonalServerFolder "Tools") -ItemType Directory
+                Start-Sleep -Seconds 3
+                Write-Information -MessageData "Copying HeidiSQL to repack folder" -InformationAction Continue
+                $HeidiURL = "https://www.heidisql.com/downloads/releases/HeidiSQL_10.3_64_Portable.zip"
+                $HeidiFileName = $HeidiURL.Split("/")[-1]
+                $HeidiZipFile = (Join-Path $DownloadFolder $HeidiFileName)
+                if (!(Test-Path -path $HeidiZipFile)) {
+                    Write-Information -MessageData "HeidiSQL not found. Downloading now" -InformationAction Continue
+                    Try {
+                        Start-BitsTransfer -Source $HeidiURL -Destination $HeidiZipFile
+                    } Catch {
+                        $fail = $_.Exception.Response.StatusCode.Value__
+                        Write-Information -Message "Failed to download $HeidiFileName with error message: $fail" -InformationAction Continue
+                        Break
+                    }
+                }
+                if (!(Test-Path -path (Join-Path $DownloadFolder "HeidiSQL\heidisql.exe"))) {
+                    Expand-Archive -Path $HeidiZipFile -DestinationPath (Join-Path $DownloadFolder "HeidiSQL")
+                    Start-Sleep -Seconds 2
+                }
+                Try {
+                    Copy-Item -Path (Join-Path $DownloadFolder "HeidiSQL") -Destination (Join-Path $PersonalServerFolder "Tools") -Recurse
+                } Catch {
+                    Write-Information -MessageData "Failed to copy HeidiSQL.  Try to manually copy from:`n$DownloadFolder\HeidiSQL`n To folder:`n$PersonalServerFolder\Tools"
+                }
+                $StartServerbat = (Join-Path $PersonalServerFolder "Start_WoW_Server.bat")
+                New-Item -Path $StartServerbat -ItemType File -Force
+                Add-Content -Path $StartServerbat -Value "@echo off
+                cd .\Server
+                start 1_start_mysql.bat
+                timeout /T 3
+                start 2_start_authserver.bat
+                timeout /T 3
+                3_start_worldserver.bat"
 
-            Write-Information -MessageData "Finished creating repack/personal server`nFiles can be found here:`n$PersonalServerFolder" -InformationAction Continue
-            Write-Information -MessageData "You can start your server by double-clicking the filed named:`nStart_WoW_Server.bat" -InformationAction Continue
-            Write-Information -MessageData "Entire folder can be zipped and shared as well" -InformationAction Continue  
+                Write-Information -MessageData "Finished creating repack/personal server`nFiles can be found here:`n$PersonalServerFolder" -InformationAction Continue
+                Write-Information -MessageData "You can start your server by double-clicking the filed named:`nStart_WoW_Server.bat" -InformationAction Continue
+                Write-Information -MessageData "Entire folder can be zipped and shared as well" -InformationAction Continue
+            }
         }
     
     }
