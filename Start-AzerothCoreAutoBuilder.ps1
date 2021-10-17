@@ -1002,6 +1002,55 @@ do {
                     Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBupdateScriptsPath
                     Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBpendingupdateScriptsPath
 
+                    $BuildModuleConfigs = Get-ChildItem -Path (Join-Path $BaseLocation "modules") -Recurse | Where-Object {$_.Name -like "*.conf.dist"}
+                    foreach ($BuildModuleConfig in $BuildModuleConfigs) {
+                        $ConfigName = $BuildModuleConfig.Name
+                        $ConfigFullName = $BuildModuleConfig.FullName
+                        $Confile = $BuildModuleConfig -replace ".{5}$"
+
+                        if (!(Test-Path -Path (Join-Path $PersonalServerFolder "Server\configs\modules\$ConfigName"))) {
+                            Copy-Item -Path $ConfigFullName -Destination (Join-Path $PersonalServerFolder "Server\configs\modules")
+                            Copy-Item -Path $ConfigFullName -Destination (Join-Path $PersonalServerFolder "Server\configs\modules\$Confile")
+                            $ModSQLBase = Split-Path $ConfigFullName | Split-Path
+                            $ModSQLfiles = Get-ChildItem -Path $ModSQLBase -Recurse -Filter "*.sql"
+                            foreach ($Modfile in $Modfiles) {
+                                $Modpath = $Modfile.FullName
+                                $SQLDatabase = $false
+                                if (($Modpath -like "*character*") -and ($Modpath -notlike "*world*") -and ($Modpath -notlike "*auth*")) {
+                                    $SQLDatabase = "acore_characters"
+                                } elseif (($Modpath -like "*world*") -and ($Modpath -notlike "*auth*") -and ($Modpath -notlike "*characters*")) {
+                                    $SQLDatabase = "acore_world"
+                                } elseif (($Modpath -like "*auth*") -and ($Modpath -notlike "*world*") -and ($Modpath -notlike "*characters*")) {
+                                    $SQLDatabase = "acore_auth"
+                                } else {
+                                    $SQLDatabase = $false
+                                }
+                                if ($SQLDatabase -eq $false) {
+                                    Write-Information -MessageData "`n`nCan not determine database for $Modpath" -InformationAction Continue
+                                    Write-Information -MessageData "Provide database sql script should be applied to`nuse format `"auth`", `"characters`", or `"world`"`n" -InformationAction Continue
+                                    do {
+                                        $SQLDatabase = Read-Host -Prompt "database for this SQL script?"
+                                    } until (($SQLDatabase -eq "auth") -or ($SQLDatabase -eq "characters") -or ($SQLDatabase -eq "world"))
+                                    if ($SQLDatabase -eq "auth") {
+                                        $SQLDatabase = "acore_auth"
+                                    }
+                                    if ($SQLDatabase -eq "character") {
+                                        $SQLDatabase = "acore_characters"
+                                    }
+                                    if ($SQLDatabase -eq "world") {
+                                        $SQLDatabase = "acore_world"
+                                    }
+                                }
+                                Try {
+                                    #Write-Host "$Modpath installing to $SQLDatabase"
+                                    Get-Content $Modpath | &".\mysql.exe" --defaults-file=..\config.cnf $SQLDatabase 
+                                } catch {
+                                    Write-Information -MessageData "$Modpath failed to import" -InformationAction Continue
+                                }
+                            }
+                        }
+                    }
+
                     $SQLAdmin = Join-Path $PersonalServerFolder "Server\database\bin\mysqladmin.exe"
                     Start-Process -FilePath $SQLAdmin -ArgumentList "--user=root --password=$SQLRootPassword shutdown"
                 }
@@ -1018,10 +1067,12 @@ do {
             }
             if ($NewRepack -eq $true) {
                 Write-Information -MessageData "Creating personal server at:`n$PersonalServerFolder" -InformationAction Continue
-                Try {
-                    New-Item -Path $PersonalServerFolder -ItemType Directory
-                } Catch {
-                    Write-Error -Message "Unable to create folder. Ensure valid path was used and retry" -ErrorAction Stop
+                if (!(Test-path -path $PersonalServerFolder)) {
+                    Try {
+                        New-Item -Path $PersonalServerFolder -ItemType Directory
+                    } Catch {
+                        Write-Error -Message "Unable to create folder. Ensure valid path was used and retry" -ErrorAction Stop
+                    }
                 }
                 Copy-Item -path (Join-Path $BuildFolder "bin\Release") -Destination $PersonalServerFolder -Recurse
                 Rename-Item -Path (Join-Path $PersonalServerFolder "Release") -NewName "Server"
