@@ -977,30 +977,15 @@ do {
                     Set-Location (Join-Path $PersonalServerFolder "Server")
                     Start-Process -FilePath "1_start_mysql.bat"
 
-                    # recreate world db
-                    $MySQLConfigCNF = Join-Path $PersonalServerFolder "Server\database\config.cnf"
-                    Set-Location (Join-Path $PersonalServerFolder "Server\database\bin")
-                    .\mysqldump.exe --defaults-file=$MySQLConfigCNF --add-drop-table --no-data acore_world > .\drop_all_tables.sql
-                    $DropTables = Join-Path $PersonalServerFolder "Server\database\bin\"
-                    Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $DropTables
-                    $DropWorld = "DROP DATABASE acore_world"
-                    $DropArgs = "--defaults-file=$MySQLConfigCNF --execute=`"$DropWorld`""
-                    Start-Process -FilePath $SQLPath -ArgumentList $DropArgs -Wait
-                    if (Test-Path -path (Join-Path $PersonalServerFolder "Server\database\data\acore_world")) {
-                        Remove-Item -path (Join-Path $PersonalServerFolder "Server\database\data\acore_world") -Recurse -Force
-                    }
-                    $CreateDBCMD = Get-Content -Path (Join-Path $BaseLocation "data\sql\create\create_mysql.sql") | Select -Index 5,11
-                    $CreateDBArgs = "--defaults-file=$MySQLConfigCNF --execute=`"$CreateDBCMD`""
-                    Start-Process -FilePath $SQLPath -ArgumentList $CreateDBArgs -Wait
-
+                    # update databases
                     Set-Location -Path (Join-Path $PersonalServerFolder "Server\database\bin")
-                    $worldDBScriptsPath = (Join-Path $BaseLocation "data\sql\base\db_world")
+                    $authDBupdateScriptsPath = (Join-Path $BaseLocation "data\sql\updates\db_auth")
+                    $charDBupdateScriptsPath = (Join-Path $BaseLocation "data\sql\updates\db_characters")
                     $worldDBupdateScriptsPath = (Join-Path $BaseLocation "data\sql\updates\db_world")
-                    $worldDBpendingupdateScriptsPath = (Join-Path $BaseLocation "data\sql\updates\pending_db_world")
 
-                    Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBScriptsPath
+                    Import-SQLscripts -SQLDatabase "acore_auth" -SQLScriptsPath $authDBupdateScriptsPath
+                    Import-SQLscripts -SQLDatabase "acore_characters" -SQLScriptsPath $charDBupdateScriptsPath
                     Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBupdateScriptsPath
-                    Import-SQLscripts -SQLDatabase "acore_world" -SQLScriptsPath $worldDBpendingupdateScriptsPath
 
                     $BuildModuleConfigs = Get-ChildItem -Path (Join-Path $BaseLocation "modules") -Recurse | Where-Object {$_.Name -like "*.conf.dist"}
                     foreach ($BuildModuleConfig in $BuildModuleConfigs) {
@@ -1013,8 +998,8 @@ do {
                             Copy-Item -Path $ConfigFullName -Destination (Join-Path $PersonalServerFolder "Server\configs\modules\$Confile")
                             $ModSQLBase = Split-Path $ConfigFullName | Split-Path
                             $ModSQLfiles = Get-ChildItem -Path $ModSQLBase -Recurse -Filter "*.sql"
-                            foreach ($Modfile in $Modfiles) {
-                                $Modpath = $Modfile.FullName
+                            foreach ($ModSQLfile in $ModSQLfiles) {
+                                $Modpath = $ModSQLfile.FullName
                                 $SQLDatabase = $false
                                 if (($Modpath -like "*character*") -and ($Modpath -notlike "*world*") -and ($Modpath -notlike "*auth*")) {
                                     $SQLDatabase = "acore_characters"
